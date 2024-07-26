@@ -202,12 +202,12 @@ In case anyone wants to know how my library is configured, I have attached my cu
 ![2](https://i.imgur.com/D2px2hW.png)
 ![3](https://i.imgur.com/WErHfC8.png)
 
-**Example for emulators that are a bit different to configure:**
+**Example for emulators that are a bit different to configure:** <br>
 rpcs3
 ![rpcs3](https://i.imgur.com/aSnGNdn.png)
 > [Templates]: rpcs3 = exepath --no-gui --fullscreen game\PS3_GAME\USRDIR\EBOOT.BIN
 
-yuzu
+<br>yuzu
 ![YUZU](https://i.imgur.com/SIy6t26.png)
 > [Templates]: yuzu = exepath -f -g game
 
