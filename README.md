@@ -32,7 +32,7 @@ I specifically made this for my need of having an emulator game hub for my Ayane
 6. [Future development](#future-development)
 
 
-# !! EmuCenter Files
+# !! EmuCenter-Files
 
 There are multiple folders and files to keep in mind, but the main application runs under `app.py`.
 
@@ -121,7 +121,7 @@ Everything inside the Emulators section can be set inside the UI.
 |emupath|Path to the emulator.exe|
 |emugamespath|Path to the games folder for the emulator|
 
-# !! Setup EmuCenter
+# !! Setup-EmuCenter
 This section goes into detail on how to set everything up in order to get everything working.
 
 ## Dependencies
@@ -162,7 +162,7 @@ To start adding your emulators and games, simply open EmuCenter and navigate to 
 
 >After adding your emulators and games, navigate to `System > Reload` for your games to load in.
 
-# !! Add more emulators
+# !! Add-more-emulators
 Adding more emulators is as simple as modifying the `settings.ini` file.
 
 Right now the following emulators have been pre-added and tested. Please be aware that the custom scripts provided by me may not work for every system/emulator version. I encourage users to code their own scripts (if needed) to fit their own needs. The included custom scripts help to start games in fullscreen for emulators that do not support a fullscreen flag nor a flag to not confirm on close.
@@ -228,7 +228,7 @@ Sorted in alphabetical order:
 Sorted by emulator:
 ![emu](https://i.imgur.com/6Ahm6XI.png)
 
-# !! How to use
+# !! How-to-use
 **Launching/closing games**
 After setting everything up, just tap on the game that you want to launch. 
 Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button.
@@ -237,5 +237,5 @@ Most of the emulators can configure an exit hotkey/shortcut. I have configured o
 When in focus, EmuCenter can be closed with ESC, ctrl+c and ctrl+q.
 
 
-# !! Future development
+# !! Future-development
 This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.
