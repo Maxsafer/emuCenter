@@ -81,7 +81,7 @@ This file is the core configuration file used for the whole application to work.
 |[Emulators]|emupath/emugamespath store the location of an emulator (can be set inside the UI)|
 
 
-**[MainWindow]:**
+**[MainWindow]:** <br>
 Everything inside the MainWindow section can be set inside the UI.
 
     fullscreen = yes/no
@@ -93,12 +93,12 @@ Everything inside the MainWindow section can be set inside the UI.
 |navbar|Sets the application navigation bar on start to be opened (yes/no)|
 |sort_by|Sets the games sorting order (alphabetical/emulator)|
 
-**[Settings]:**
+**[Settings]:** <br>
 
     emulatorname = Really small description
 This is manually added to this file when adding a new emulator.
 
-**[Templates]:**
+**[Templates]:** <br>
 This sets the logic for a game to be launched for each emulator.
 
     emulatorname  = exepath --flag1 -flagx game ?python:./scripts/customscript.py=param1 paramx emupath,python:./scripts/customscript2.py=param1
@@ -114,7 +114,7 @@ This sets the logic for a game to be launched for each emulator.
 |*params*[=]|Prefix to pass parameters to a custom script|
 |parameters|Between each parameter a single space should exist|
 
-**[Emulators]:**
+**[Emulators]:** <br>
 Everything inside the Emulators section can be set inside the UI.
 |Configuration|Use|
 |--|--|
@@ -154,7 +154,7 @@ PPSSPP installs under "Program Files" so it has been handled inside the settings
 Folder containing emulatorname.exe must contain emulator name at the moment.
 
 ###
-**Configure your games and emulators**
+**Configure your games and emulators** <br>
 To start adding your emulators and games, simply open EmuCenter and navigate to the settings tab, from there everything should be straight forward.
 
  - **Select Emulator button:** Select your emulator .exe 
@@ -229,11 +229,11 @@ Sorted by emulator:
 ![emu](https://i.imgur.com/6Ahm6XI.png)
 
 # !! How-to-use
-**Launching/closing games**
+**Launching/closing games** <br>
 After setting everything up, just tap on the game that you want to launch. 
 Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button.
 
-**Closing EmuCenter**
+**Closing EmuCenter** <br>
 When in focus, EmuCenter can be closed with ESC, ctrl+c and ctrl+q.
 
 
