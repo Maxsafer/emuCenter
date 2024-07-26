@@ -103,7 +103,7 @@ This sets the logic for a game to be launched for each emulator.
 |exepath|Should be used as it is, this string is recognized inside the app and is replaced with the emulator executable path|
 |game|Should be used as it is, this string is recognized inside the app and is replaced with the game to run path|
 |emupath|Should be used as it is, this string is recognized inside the app and is replaced with the emulator path|
-|optional[?]|Prefix to run any commands recognized by the users CLI, followed by ":" for the script (file) to run followed by "=" to add parmeters. This prefix should be added at the end and all scripts and all commands should be separated by ","|
+|*optional*[?]|Prefix to run any commands recognized by the users CLI, followed by ":" for the script (file) to run followed by "=" to add parmeters. This prefix should be added at the end and all scripts and all commands should be separated by ","|
 |*commands*[,]|Between each command a single comma should exist|
 |*script*[:]|Prefix to pass the custom script to run|
 |*params*[=]|Prefix to pass parameters to a custom script|
