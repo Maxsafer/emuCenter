@@ -195,7 +195,7 @@ With this steps adding a new emulator should be fairly simple.
 
 ## My personal configuration
 
-In case anyone wants to know hoy my library is configured, I have attached my custom scripts to the repo and my settings.ini (without my paths, so go ahead and set yours).
+In case anyone wants to know how my library is configured, I have attached my custom scripts to the repo and my settings.ini (without my paths, so go ahead and set yours).
 
 **My settings tab looks like this:**
 ![1](https://i.imgur.com/TIF1USp.png)
