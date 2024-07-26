@@ -6,7 +6,7 @@ I specifically made this for my need of having an emulator game hub for my Ayane
 
 # Table of Contents
 
-1. [EmuCenter Files](#emucenter-files)
+1. [EmuCenter Files](#-emucenter-files)
    - [Directories](#directories)
      - [/images](#images)
      - [/scripts](#scripts)
@@ -16,20 +16,20 @@ I specifically made this for my need of having an emulator game hub for my Ayane
      - [/xinput_handler.py](#xinput_handlerpy)
    - [Configuration files](#configuration-files)
      - [/settings.ini](#settingsini)
-2. [Setup EmuCenter](#setup-emucenter)
+2. [Setup EmuCenter](#-setup-emucenter)
    - [Dependencies](#dependencies)
    - [Install EmuCenter](#install-emucenter)
    - [Setting up EmuCenter](#setting-up-emucenter)
    - [Configure your games and emulators](#configure-your-games-and-emulators)
-3. [Add more emulators](#add-more-emulators)
+3. [Add more emulators](#-add-more-emulators)
    - [Example](#example)
    - [My personal configuration](#my-personal-configuration)
-4. [Pictures](#pictures)
+4. [Pictures](#-pictures)
    - [Game Library](#game-library)
-5. [How to use](#how-to-use)
+5. [How to use](#-how-to-use)
    - [Launching/closing games](#launchingclosing-games)
    - [Closing EmuCenter](#closing-emucenter)
-6. [Future development](#future-development)
+6. [Future development](#-future-development)
 
 
 # !! EmuCenter-Files
