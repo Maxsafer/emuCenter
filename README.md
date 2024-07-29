@@ -243,4 +243,5 @@ Most of the emulators can configure an exit hotkey/shortcut. I have configured o
 When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "X".
 
 # !! Future-development
-This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.
+This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.<br>
+[Support cool projects like this one! :)](https://www.paypal.com/donate/?hosted_button_id=SRATUX8VNHC9G)
