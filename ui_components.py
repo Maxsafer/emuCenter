@@ -783,6 +783,10 @@ class MainWindow(QMainWindow):
         self.selected_col = min(self.selected_col, new_col_max)
 
         self.highlight_selected_game()
+        
+        # Ensure the selected game button is visible within the scroll area
+        selected_button = self.games_in_grid[self.selected_row][self.selected_col]
+        self.grid_scroll_area.ensureWidgetVisible(selected_button)
 
     def handle_button_a(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
