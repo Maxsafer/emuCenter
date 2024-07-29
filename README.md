@@ -224,13 +224,23 @@ Sorted by emulator:
 ![emu](https://i.imgur.com/6Ahm6XI.png)
 
 # !! How-to-use
+**Touch and Controller Support** <br>
+Touch controls are set to simply scroll with your finger and tap. For controllers, the bindings are:
+|Button|Binding|
+|--|--|
+|A|Launches the selected game|
+|B|Toggles the navigation menu|
+|X|Closes EmuCenter|
+|Y|Toggles between sorting orders (2 atm, alphabetical and emulator)|
+|D-PAD|Navigates the game grid to select the desired game to launch|
+
+
 **Launching/closing games** <br>
 After setting everything up, just tap on the game that you want to launch. 
 Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button.
 
 **Closing EmuCenter** <br>
-When in focus, EmuCenter can be closed with ESC, ctrl+c and ctrl+q.
-
+When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "X".
 
 # !! Future-development
 This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.
