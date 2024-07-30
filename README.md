@@ -1,6 +1,6 @@
 # Welcome to EmuCenter!
 
-I made this highly customizable (if you are a programmer. If not, it is still fairly simple to follow the documentation) hub in order to have all of my retro games from different emulators ready to launch from just one place. I have used other alternatives (not getting into details) that did look prettier but did not work a 100% as needed nor would be highly customizable, I prefered the simplicity and optional complexity that this brings to the table.
+I made this highly customizable (if you are a programmer. If not, it is still fairly simple to follow the documentation) hub in order to have all of my retro games from different emulators ready to launch from just one place. I have used other alternatives (not getting into details) that did look prettier but did not work a 100% as needed nor would be highly customizable, I preferred the simplicity and optional complexity that this brings to the table.
 
 I specifically made this for my need of having an emulator game hub for my Ayaneo Slide (handheld PC with a touchscreen).
 
@@ -133,7 +133,7 @@ To install PyQt5, package installer for Python (pip) is needed, it should instal
 
 ## Install EmuCenter
 
-You can either clone or download a zip from GitHub. Place the repo/unzipped folder under your prefered location. You can create a shortcut for a batch script that runs `python app.py`.
+You can either clone or download a zip from GitHub. Place the repo/unzipped folder under your preferred location. You can create a shortcut for a batch script that runs `python app.py`.
 
 
 ## Setting up EmuCenter
