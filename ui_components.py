@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QMainWindow, QAction, QDesktopWidget, QApplication, QCheckBox, QFileDialog, QScrollArea, QGridLayout, QScroller, QDialog, QShortcut, QToolButton, QMenu, QTextEdit
+from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QMainWindow, QAction, QDesktopWidget, QApplication, QCheckBox, QFileDialog, QScrollArea, QGridLayout, QScroller, QDialog, QShortcut, QMenu, QTextEdit
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QKeySequence
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from xinput_handler import XInputHandler
@@ -69,6 +69,25 @@ class QHLine(QFrame):
         self.setFrameShape(QFrame.HLine)
         self.setFrameShadow(QFrame.Sunken)
 
+class TouchScrollArea(QScrollArea):
+    screenTouched = pyqtSignal()  # Signal to indicate that the screen was touched
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_AcceptTouchEvents)
+
+    def mousePressEvent(self, event):
+        self.screenTouched.emit()  # Emit the signal when the screen is touched
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        self.screenTouched.emit()  # Emit the signal when the screen is touched
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self.screenTouched.emit()  # Emit the signal when the screen is touched
+        super().mouseReleaseEvent(event)
+
 class MainWindow(QMainWindow):
     def __init__(self, fullscreen=False, navbar=True, sort_by='alphabetical'):
         super().__init__()
@@ -80,7 +99,10 @@ class MainWindow(QMainWindow):
         self.selected_row = 0  # Track the selected row in the grid
         self.selected_col = 0  # Track the selected column in the grid
         self.games_in_grid = []  # Track the games in the grid layout
-        self.grid_scroll_area = None  # Reference to the scroll area
+        self.screen_touched = False  # Flag to track if the screen was touched
+
+        # Set the window icon
+        self.setWindowIcon(QIcon('images/logo.png'))
 
         # Check if the file exists
         if not os.path.exists(file_path):
@@ -204,13 +226,15 @@ class MainWindow(QMainWindow):
         home_widget = QWidget()
         home_layout = QVBoxLayout()
 
-        self.grid_scroll_area = QScrollArea()  # Set self.grid_scroll_area reference
+        self.grid_scroll_area = TouchScrollArea()  # Use the custom TouchScrollArea
         self.grid_scroll_area.setWidgetResizable(True)
         self.grid_scroll_area.setStyleSheet("background-color: #303030;")  # Set background color for scroll area
         grid_widget = QWidget()
         grid_widget.setStyleSheet("background-color: #303030;")  # Set background color for grid widget
         self.grid_layout = QGridLayout(grid_widget)
         self.grid_scroll_area.setWidget(grid_widget)
+
+        self.grid_scroll_area.screenTouched.connect(self.on_screen_touched)  # Connect the signal to the handler
 
         # Enable touch scrolling
         QScroller.grabGesture(self.grid_scroll_area.viewport(), QScroller.LeftMouseButtonGesture)
@@ -353,6 +377,9 @@ class MainWindow(QMainWindow):
             self.add_game_to_grid(game)
         self.recalculate_grid_layout()
     
+    def on_screen_touched(self):
+        self.screen_touched = True  # Set the flag when the screen is touched
+
     def update_sort_by_setting(self, sort_by_value):
         self.update_settings('MainWindow', 'sort_by', sort_by_value)
         self.sort_by = sort_by_value
@@ -407,10 +434,6 @@ class MainWindow(QMainWindow):
     def show_popup(self):
         # Show the custom popup message
         msg_box = CustomMessageBox()
-
-    def init_xinput_handler(self):
-        self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label)
-        self.xinput_handler.dpad_signal.connect(self.handle_dpad_input)
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
@@ -735,6 +758,12 @@ class MainWindow(QMainWindow):
         """
         Highlight the currently selected game in the grid.
         """
+        if not self.games_in_grid:
+            return  # If there are no games in the grid, do nothing
+        
+        if self.screen_touched:
+            return  # Do not snap to the selected game if the screen was touched
+        
         for row in range(len(self.games_in_grid)):
             for col in range(len(self.games_in_grid[row])):
                 button = self.games_in_grid[row][col]
@@ -752,12 +781,22 @@ class MainWindow(QMainWindow):
                 else:
                     self.style_button(button)
 
+        # Ensure the selected game button is visible within the scroll area
+        selected_button = self.games_in_grid[self.selected_row][self.selected_col]
+        self.grid_scroll_area.ensureWidgetVisible(selected_button)
+
     def handle_dpad_input(self, dpad_state):
         if not self.games_in_grid:
             return  # If there are no games in the grid, do nothing
         
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
+
+        if not any(dpad_state.values()):
+            return  # If no D-Pad button is actually pressed, do nothing
+
+        # Reset the screen_touched flag since a controller input was detected
+        self.screen_touched = False
 
         current_row_games = self.games_in_grid[self.selected_row]
         current_col_max = len(current_row_games) - 1
@@ -783,10 +822,6 @@ class MainWindow(QMainWindow):
         self.selected_col = min(self.selected_col, new_col_max)
 
         self.highlight_selected_game()
-
-        # Ensure the selected game button is visible within the scroll area
-        selected_button = self.games_in_grid[self.selected_row][self.selected_col]
-        self.grid_scroll_area.ensureWidgetVisible(selected_button)
 
     def handle_button_a(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
