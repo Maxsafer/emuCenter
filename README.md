@@ -121,7 +121,7 @@ This section goes into detail on how to set everything up in order to get everyt
 
 ## Dependencies
 
- - Python 3.8+
+ - Python 3.12+ (could work on older versions it but has not been tested)
  - Python package PyQt5
 
 You can get Python from their official website:
