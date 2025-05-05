@@ -1,5 +1,7 @@
 # Welcome to EmuCenter!
-
+<p align="center">
+   <img src="https://github.com/Maxsafer/emuCenter/blob/b0445116bba8288f029d4bd41e0d4b3b2e284ffa/images/logo.png" alt="logo" width=50%/>
+</p>
 I made this highly customizable (if you are a programmer. If not, it is still fairly simple to follow the documentation) hub in order to have all of my retro games from different emulators ready to launch from just one place. I have used other alternatives (not getting into details) that did look prettier but did not work a 100% as needed nor would be highly customizable, I preferred the simplicity and optional complexity that this brings to the table.
 
 I specifically made this for my need of having an emulator game hub for my Ayaneo Slide (handheld PC with a touchscreen).
