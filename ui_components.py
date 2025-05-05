@@ -400,11 +400,18 @@ class MainWindow(QMainWindow):
             return ''
 
     def get_games_names(self):
-        excluded_extensions = [".bin",".sav",".txt","shortcuts"]
+        excluded_extensions = []
         games_names = []
         games_paths = []
         emulators_games = {}
         templates = {}
+
+        for key, value in self.config.items('MainWindow'):
+            if "exclude" in key:
+                excluded_extensions = value.replace(" ","").split(",")
+            else:
+                excluded_extensions = [".bin",".sav",".txt","shortcuts",".sgm",".srm"]
+
 
         for key, value in self.config.items('Emulators'):
             if "exe" in value:
@@ -601,6 +608,7 @@ class MainWindow(QMainWindow):
         return command.replace("/","\\")
 
     def run_command(self, command, popup:bool):
+        print("Running command: ", command)
         worker = Worker(command)
         worker.output_signal.connect(self.display_output)
         worker.finished_signal.connect(lambda: self.worker_finished(worker))
