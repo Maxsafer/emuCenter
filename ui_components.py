@@ -88,6 +88,41 @@ class TouchScrollArea(QScrollArea):
         self.screenTouched.emit()  # Emit the signal when the screen is touched
         super().mouseReleaseEvent(event)
 
+class Blocker(QWidget):
+    """
+    A full‐window, transparent widget that
+    (a) eats all mouse events, and
+    (b) forces a BlankCursor.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        # cover the entire parent
+        self.setGeometry(parent.rect())
+        # make sure it’s on top
+        self.setAttribute(Qt.WA_NoSystemBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.setWindowFlags(Qt.Widget | Qt.FramelessWindowHint)
+        # transparent paint
+        self.setStyleSheet("background: rgba(0,0,0,0%);")
+        # always hide cursor when over this widget
+        self.setCursor(Qt.BlankCursor)
+        self.hide()
+
+    def resizeEvent(self, event):
+        # keep covering parent when it resizes
+        self.setGeometry(self.parent().rect())
+        super().resizeEvent(event)
+
+    def mousePressEvent(self, event):
+        # eat everything
+        event.accept()
+    def mouseReleaseEvent(self, event):
+        event.accept()
+    def mouseMoveEvent(self, event):
+        event.accept()
+    def wheelEvent(self, event):
+        event.accept()
+
 class MainWindow(QMainWindow):
     def __init__(self, fullscreen=False, navbar=True, sort_by='alphabetical'):
         super().__init__()
@@ -123,6 +158,7 @@ class MainWindow(QMainWindow):
         self.game_executables = []
         self.emulators = []
         self.init_ui()
+        self._blocker = Blocker(self)
         self.setup_shortcuts()
         self.highlight_selected_game()
         self.init_xinput_handler()
@@ -793,6 +829,12 @@ class MainWindow(QMainWindow):
         selected_button = self.games_in_grid[self.selected_row][self.selected_col]
         self.grid_scroll_area.ensureWidgetVisible(selected_button)
 
+    def setFrozen(self, freeze: bool):
+        if freeze:
+            self._blocker.show()
+        else:
+            self._blocker.hide()
+
     def handle_dpad_input(self, dpad_state):
         if not self.games_in_grid:
             return  # If there are no games in the grid, do nothing
@@ -805,6 +847,7 @@ class MainWindow(QMainWindow):
 
         # Reset the screen_touched flag since a controller input was detected
         self.screen_touched = False
+        self.setFrozen(True)
 
         current_row_games = self.games_in_grid[self.selected_row]
         current_col_max = len(current_row_games) - 1
@@ -842,11 +885,7 @@ class MainWindow(QMainWindow):
     def handle_button_b(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
-
-        if self.nav_widget.isVisible():
-            self.toggle_navbar()
-        else:
-            self.toggle_navbar()
+        self.setFrozen(False)
 
     def handle_button_x(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
@@ -868,6 +907,15 @@ class MainWindow(QMainWindow):
         self.selected_col = 0
         self.highlight_selected_game()
 
+    def handle_button_start(self):
+        if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
+            return
+        
+        if self.nav_widget.isVisible():
+            self.toggle_navbar()
+        else:
+            self.toggle_navbar()
+
     def init_xinput_handler(self):
         self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label, self)
         self.xinput_handler.dpad_signal.connect(self.handle_dpad_input)
@@ -875,6 +923,7 @@ class MainWindow(QMainWindow):
         self.xinput_handler.button_b_signal.connect(self.handle_button_b)
         self.xinput_handler.button_x_signal.connect(self.handle_button_x)
         self.xinput_handler.button_y_signal.connect(self.handle_button_y)
+        self.xinput_handler.button_start_signal.connect(self.handle_button_start)
 
     def update_sort_by_setting(self, sort_by_value):
         self.update_settings('MainWindow', 'sort_by', sort_by_value)

@@ -47,6 +47,7 @@ class XInputHandler(QObject):
     button_b_signal = pyqtSignal()
     button_y_signal = pyqtSignal()
     button_x_signal = pyqtSignal()
+    button_start_signal = pyqtSignal()
 
     def __init__(self, settings_label, buttons_label, window):
         super().__init__()
@@ -82,6 +83,8 @@ class XInputHandler(QObject):
                     self.button_x_signal.emit()
                 if state.Gamepad.wButtons & 0x8000:  # Y button pressed
                     self.button_y_signal.emit()
+                if state.Gamepad.wButtons & 0x0010:  # START button pressed
+                    self.button_start_signal.emit()
 
         if any_controller_connected:
             self.settings_label.setText("\nController(s) connected")
