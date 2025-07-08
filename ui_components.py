@@ -882,12 +882,12 @@ class MainWindow(QMainWindow):
         if isinstance(selected_button, QPushButton):
             selected_button.click()
 
-    def handle_button_b(self):
+    def handle_button_x(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
         self.setFrozen(False)
 
-    def handle_button_x(self):
+    def handle_button_b(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
 
