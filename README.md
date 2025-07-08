@@ -231,9 +231,10 @@ Touch controls are set to simply scroll with your finger and tap. For controller
 |Button|Binding|
 |--|--|
 |A|Launches the selected game|
-|B|Toggles the navigation menu|
-|X|Closes EmuCenter|
+|X|Unlocks touch controls whenever a controller interacts with the UI|
+|B|Closes EmuCenter|
 |Y|Toggles between sorting orders (2 atm, alphabetical and emulator)|
+|START|Toggles the navigation menu|
 |D-PAD|Navigates the game grid to select the desired game to launch|
 
 
