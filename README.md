@@ -240,7 +240,7 @@ Touch controls are set to simply scroll with your finger and tap. For controller
 
 **Launching/closing games** <br>
 After setting everything up, just tap on the game that you want to launch. 
-Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button.
+Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button or to set a button to "close program" which closes the emulator running.
 
 **Closing EmuCenter** <br>
 When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "B".
