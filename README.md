@@ -231,7 +231,7 @@ Touch controls are set to simply scroll with your finger and tap. For controller
 |Button|Binding|
 |--|--|
 |A|Launches the selected game|
-|X|Unlocks touch controls whenever a controller interacts with the UI|
+|X|Unlocks touch controls that get blocked whenever a controller interacts with the UI|
 |B|Closes EmuCenter|
 |Y|Toggles between sorting orders (2 atm, alphabetical and emulator)|
 |START|Toggles the navigation menu|
@@ -243,7 +243,7 @@ After setting everything up, just tap on the game that you want to launch.
 Most of the emulators can configure an exit hotkey/shortcut. I have configured on my emulators every game to exit on ESC since most of them already exit like that. Also, it was easy to configure my handheld to do ESC with a custom Ayaneo button.
 
 **Closing EmuCenter** <br>
-When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "X".
+When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "B".
 
 # !! Future-development
 This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.<br>
