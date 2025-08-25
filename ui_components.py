@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, Q
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QKeySequence
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from xinput_handler import XInputHandler
+import hashlib, base64
 import configparser
 import subprocess
 import time
@@ -434,7 +435,7 @@ class MainWindow(QMainWindow):
                 return emulator
         else:
             return ''
-
+    
     def get_games_names(self):
         excluded_extensions = []
         games_names = []
@@ -461,19 +462,41 @@ class MainWindow(QMainWindow):
         for game_path in games_paths:
             if os.path.exists(game_path):
                 files = os.listdir(game_path)
-                files = [file for file in files if not any(file.endswith(ext) for ext in excluded_extensions)]
-                emulators_games[os.path.dirname(game_path)] += files
+                files2 = []
+                for file in files:
+                    if not any(file.endswith(ext) for ext in excluded_extensions):
+                        if file in games_names:
+                            old_path = os.path.join(game_path, file)
+                            root, ext = os.path.splitext(file)
+                            id = self.emu_tag(game_path, k=3)
+                            new_name = f"{root}.{id}{ext}"
+                            new_path = os.path.join(game_path, new_name)
+                            # avoid collision if the target already exists
+                            i = 2
+                            while os.path.exists(new_path):
+                                new_name = f"{root}.{id}-{i}{ext}"
+                                new_path = os.path.join(game_path, new_name)
+                                i += 1
+                            os.rename(old_path, new_path)
+                            files2.append(new_name)
+                        else:
+                            files2.append(file)
+                emulators_games[os.path.dirname(game_path)] += files2
 
                 set_emu = self.set_emulator(emulators_games[os.path.dirname(game_path)][0].lower())
                     
                 self.game_executables += [templates[set_emu].replace("exepath", emulators_games[os.path.dirname(game_path)][0]).replace("game", f'"{os.path.join(game_path, file)}"') for file in emulators_games[os.path.dirname(game_path)] if "exe" not in file]
-                games_names += files
+                games_names += files2
             
             else:
                 print("Path does not exist: ", game_path)
 
         return {'total_games':len(games_names), 'list_games':games_names}
     
+    def emu_tag(self, emulator_name, k=3):
+        h = hashlib.sha1(emulator_name.lower().encode()).digest()
+        return base64.b32encode(h).decode().lower().replace('=', '')[:k]
+
     def show_popup(self):
         # Show the custom popup message
         msg_box = CustomMessageBox()
