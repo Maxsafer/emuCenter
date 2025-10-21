@@ -172,6 +172,7 @@ Right now the following emulators have been pre-added and tested. Please be awar
  - desmume - 0.9.13
  - citra - Nightly 2104
  - yuzu - 1732
+ - eden - 0.0.3-rc3
  - ppsspp - 1.17.1
  - duckstation - 0.1-6922-gf41c238c
  - pcsx2 - 1.7.5913
