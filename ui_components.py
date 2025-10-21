@@ -1,7 +1,9 @@
-from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QMainWindow, QAction, QDesktopWidget, QApplication, QCheckBox, QFileDialog, QScrollArea, QGridLayout, QScroller, QDialog, QShortcut, QMenu, QTextEdit
+from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QMainWindow, QAction, QDesktopWidget, QApplication, QCheckBox, QFileDialog, QScrollArea, QGridLayout, QScroller, QDialog, QShortcut, QMenu, QTextEdit, QComboBox, QListView
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QKeySequence
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from xinput_handler import XInputHandler
+from xinput_utils import xinput_connected_indices
+from virtual_pad_vg import VirtualX360
 import hashlib, base64
 import configparser
 import subprocess
@@ -137,13 +139,31 @@ class MainWindow(QMainWindow):
         self.games_in_grid = []  # Track the games in the grid layout
         self.screen_touched = False  # Flag to track if the screen was touched
 
+        self.config.read(file_path)
+        self.vpad_enabled = self.config.getboolean('MainWindow', 'virtual_controller', fallback=True)
+        self.preferred_controller_idx = self.config.getint('MainWindow', 'preferred_controller', fallback=-1)
+        self.vpad = None
+        self.ignored_xinput_indices = []
+
+        if self.vpad_enabled:
+            beforexinput = xinput_connected_indices()
+            self.vpad = VirtualX360(poll_hz=250, idle_hold_ms=500)
+            try:
+                self.vpad.start()
+                afterxinput = xinput_connected_indices()
+                diff = afterxinput - beforexinput
+                self.ignored_xinput_indices = list(diff) if diff else []
+            except Exception as e:
+                print(self, "Virtual Pad", f"Failed to start virtual pad:\n{e}")
+                self.vpad = None
+
         # Set the window icon
         self.setWindowIcon(QIcon('images/logo.png'))
 
         # Check if the file exists
         if not os.path.exists(file_path):
             # If the file does not exist, create it
-            self.config['MainWindow'] = {'fullscreen': 'no', 'navbar': 'no', 'sort_by': 'alphabetical'}
+            self.config['MainWindow'] = {'fullscreen': 'no', 'navbar': 'no', 'sort_by': 'alphabetical', 'virtual_controller': 'no'}
             self.config['Templates'] = {}
             self.config['Settings'] = {}
             self.config['Emulators'] = {}
@@ -165,7 +185,7 @@ class MainWindow(QMainWindow):
         self.init_xinput_handler()
 
     def init_ui(self):
-        self.setWindowTitle('EmuCenter v1.0')
+        self.setWindowTitle('EmuCenter v1.1')
         self.setFixedSize(1500, 1000)
         centerPoint = QDesktopWidget().availableGeometry().center()
         qtRectangle = self.frameGeometry()
@@ -181,7 +201,7 @@ class MainWindow(QMainWindow):
 
         # Hamburger menu button
         self.hamburger_button = QPushButton()
-        self.hamburger_button.setFixedSize(100, 35)
+        self.hamburger_button.setFixedSize(100, 60)
         self.hamburger_button.setText("☰")
         self.hamburger_button.setStyleSheet("background-color: #2a2a2a; border: none;")
         self.hamburger_button.clicked.connect(self.toggle_navbar)
@@ -201,9 +221,9 @@ class MainWindow(QMainWindow):
         self.style_button(nav_button2)
         self.style_button(nav_button4)
 
-        nav_button1.setFont(QFont("Arial", self.centralWidget().width() // 50, QFont.Bold))
-        nav_button2.setFont(QFont("Arial", self.centralWidget().width() // 50, QFont.Bold))
-        nav_button4.setFont(QFont("Arial", self.centralWidget().width() // 50, QFont.Bold))
+        nav_button1.setFont(QFont("Arial", self.centralWidget().width() // 40, QFont.Bold))
+        nav_button2.setFont(QFont("Arial", self.centralWidget().width() // 40, QFont.Bold))
+        nav_button4.setFont(QFont("Arial", self.centralWidget().width() // 40, QFont.Bold))
 
         # Create the dropdown menu
         dropdown_button = QPushButton()
@@ -211,8 +231,7 @@ class MainWindow(QMainWindow):
 
         dropdown_button.setText("Order by")
         dropdown_button.setFixedSize(200, 120)
-        dropdown_button.setFont(QFont("Arial", self.centralWidget().width() // 50, QFont.Bold))
-        # dropdown_button.setPopupMode(QToolButton.MenuButtonPopup)
+        dropdown_button.setFont(QFont("Arial", self.centralWidget().width() // 40, QFont.Bold))
 
         dropdown_menu = QMenu(dropdown_button)
         option1 = QAction("Alphabetical", self)
@@ -223,25 +242,69 @@ class MainWindow(QMainWindow):
         dropdown_menu.addAction(option1)
         dropdown_menu.addAction(option2)
         dropdown_menu.setStyleSheet("""
-        QMenu {
-            background-color: #2a2a2a;  /* Background color */
-            color: white;  /* Text color */
-            font-size: 100px;
-            border: 20px solid #3a3a3a;  /* Border color */
-        }
-        QMenu::item {
-            background-color: #2a2a2a;  /* Item background color */
-            color: white;  /* Item text color */
-        }
-        QMenu::item:selected {
-            background-color: #3a3a3a;  /* Selected item background color */
-            color: white;  /* Selected item text color */
-        }
-    """)
+            QMenu {
+                background-color: #3a3a3a;  /* Background color */
+                color: white;  /* Text color */
+                font-size: 100px;
+                border: 20px solid #3a3a3a;  /* Border color */
+            }
+            QMenu::item {
+                background-color: #3a3a3a;  /* Item background color */
+                color: white;  /* Item text color */
+            }
+            QMenu::item:selected {
+                background-color: #2a2a2a;  /* Selected item background color */
+                color: white;  /* Selected item text color */
+            }
+        """)
         dropdown_button.setMenu(dropdown_menu)
+
+        # --- Primary Controller (nav) ---
+        self.nav_controller_combo = QComboBox()
+        self.nav_controller_combo.setFixedSize(200, 120)
+        self.nav_controller_combo.setFont(QFont("Arial", self.centralWidget().width() // 40, QFont.Bold))
+        self.nav_controller_combo.setView(QListView())
+        self.nav_controller_combo.view().setMinimumWidth(self.centralWidget().width())
+        self.nav_controller_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #2a2a2a;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding-left: 45px;
+            }
+            QComboBox:hover {
+                background-color: #3a3a3a;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 0px;
+            }
+            QComboBox::down-arrow { width: 0; height: 0; }
+            QComboBox QAbstractItemView {
+                background-color: #3a3a3a;
+                color: white;
+                border: 20px solid #3a3a3a;
+                outline: 0;
+                font-size: 100px;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 100px;  
+                padding: 20px 40px;          
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #2a2a2a;
+                color: white;
+            }
+        """)
+        self.populate_any_controller_combo(self.nav_controller_combo)
+        self.nav_controller_combo.activated.connect(
+            lambda _: (self.on_controller_changed_from(self.nav_controller_combo), self.populate_any_controller_combo(self.nav_controller_combo))
+        )
 
         self.nav_layout.addWidget(nav_button1)
         self.nav_layout.addWidget(dropdown_button)
+        self.nav_layout.addWidget(self.nav_controller_combo)
         self.nav_layout.addWidget(nav_button2)
         self.nav_layout.addWidget(nav_button4)
         self.nav_layout.addStretch(1)
@@ -328,6 +391,33 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(self.startup_label)
         settings_layout.addWidget(self.fullscreen_checkbox)
         settings_layout.addWidget(self.navbar_checkbox)
+
+        self.input_label = QLabel("\nInput")
+        self.input_label.setFont(QFont("Arial", 25, 100))
+        self.input_label.setStyleSheet("color: white;")
+        settings_layout.addWidget(self.input_label)
+
+        self.vpad_checkbox = QCheckBox("Enable virtual controller (ViGEm)")
+        self.vpad_checkbox.setFont(QFont("Arial", 18))
+        self.vpad_checkbox.setStyleSheet("color: white;")
+        self.vpad_checkbox.setChecked(self.vpad_enabled)
+        self.vpad_checkbox.stateChanged.connect(self.on_vpad_checkbox_changed)
+
+        self.controller_label = QLabel("Enable a primary controller?")
+        self.controller_label.setFont(QFont("Arial", 18))
+        self.controller_label.setStyleSheet("color: white;")
+
+        self.controller_combo = QComboBox()
+        self.controller_combo.setStyleSheet("color: white; background-color: #2a2a2a;")
+        self.controller_combo.setFont(QFont("Arial", 18))
+        self.populate_controller_combo()
+        self.controller_combo.activated.connect(self.on_controller_changed)
+
+        settings_layout.addWidget(self.controller_label)
+        settings_layout.addWidget(self.controller_combo)
+        settings_layout.addWidget(self.vpad_checkbox)
+        settings_layout.addWidget(self.buttons_label)
+
         settings_layout.addWidget(self.emulator_label)
 
         emulators_desc = self.get_emulators()
@@ -336,7 +426,6 @@ class MainWindow(QMainWindow):
             self.add_emulator_section(settings_layout, f"{emulator.upper()} ({emulators_desc.get(emulator)})", f'{emulator.lower()}Path', f'{emulator.lower()}GamesPath', f"{emulator}")
 
         settings_layout.addWidget(self.settings_label)
-        settings_layout.addWidget(self.buttons_label)
         settings_layout.addStretch(1)  # Add stretch to push items to the top
         settings_widget.setLayout(settings_layout)
         settings_widget.setAutoFillBackground(True)
@@ -349,7 +438,7 @@ class MainWindow(QMainWindow):
         about_layout = QVBoxLayout()
 
         # About label
-        about_label = QLabel("EmuCenter version 1.0")
+        about_label = QLabel("EmuCenter version 1.1")
         about_label.setFont(QFont("Arial", 24, QFont.Bold))
         about_label.setAlignment(Qt.AlignLeft)
         about_label.setStyleSheet("color: white;")
@@ -386,8 +475,13 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(settings_scroll_area)  # Add the scroll area
         self.stacked_widget.addWidget(about_widget)
 
-        nav_button1.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(home_widget))
-        nav_button2.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.stacked_widget.widget(1)))
+        nav_button1.clicked.connect(lambda: (self.stacked_widget.setCurrentWidget(home_widget),
+                                     self.populate_controller_combo(),
+                                     self.populate_any_controller_combo(self.nav_controller_combo)))
+        
+        nav_button2.clicked.connect(lambda: (self.populate_controller_combo(),
+                                     self.populate_any_controller_combo(self.nav_controller_combo),
+                                     self.stacked_widget.setCurrentWidget(self.stacked_widget.widget(1))))
         nav_button4.clicked.connect(QApplication.quit)
 
         # Add hamburger button and nav_widget to the main layout
@@ -414,6 +508,79 @@ class MainWindow(QMainWindow):
             self.add_game_to_grid(game)
         self.recalculate_grid_layout()
     
+    def populate_any_controller_combo(self, combo: QComboBox):
+        try:
+            indices = sorted(list(xinput_connected_indices()))
+        except Exception:
+            indices = []
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("None", -1)
+        for idx in indices:
+            combo.addItem(f"XInput {idx}", idx)
+        pos = combo.findData(self.preferred_controller_idx)
+        combo.setCurrentIndex(0 if pos < 0 else pos)
+        combo.blockSignals(False)
+
+    def populate_controller_combo(self):
+        self.populate_any_controller_combo(self.controller_combo)
+
+    def on_controller_changed_from(self, combo: QComboBox):
+        data = combo.currentData()
+        self.preferred_controller_idx = int(data) if data is not None else -1
+        self.update_settings('MainWindow', 'preferred_controller', str(self.preferred_controller_idx))
+        # sync the other combo(s)
+        if hasattr(self, 'controller_combo') and combo is not self.controller_combo:
+            self.populate_any_controller_combo(self.controller_combo)
+        if hasattr(self, 'nav_controller_combo') and combo is not self.nav_controller_combo:
+            self.populate_any_controller_combo(self.nav_controller_combo)
+
+    def on_controller_changed(self, _):
+        self.on_controller_changed_from(self.controller_combo)
+
+    def on_vpad_checkbox_changed(self, state):
+        enabled = (state == Qt.Checked)
+        # persist setting
+        self.update_settings('MainWindow', 'virtual_controller', 'yes' if enabled else 'no')
+        self.vpad_enabled = enabled
+
+        if enabled and self.vpad is None:
+            # (re)start vpad and recompute ignore index
+            beforexinput = xinput_connected_indices()
+            self.vpad = VirtualX360(poll_hz=250, idle_hold_ms=500)
+            try:
+                self.vpad.start()
+                afterxinput = xinput_connected_indices()
+                diff = afterxinput - beforexinput
+                self.ignored_xinput_indices = list(diff) if diff else []
+            except Exception as e:
+                print(self, "Virtual Pad", f"Failed to start virtual pad:\n{e}")
+                self.vpad = None
+                # roll back checkbox if start failed
+                self.vpad_checkbox.blockSignals(True)
+                self.vpad_checkbox.setChecked(False)
+                self.vpad_checkbox.blockSignals(False)
+                self.ignored_xinput_indices = []
+        elif not enabled and self.vpad is not None:
+            # stop vpad and clear ignore index
+            try:
+                self.vpad.stop()
+            except Exception as e:
+                print(f"Error stopping vpad: {e}")
+            self.vpad = None
+            self.ignored_xinput_indices = []
+
+        # inform the handler about new ignore set, if it exists
+        if hasattr(self, 'xinput_handler'):
+            try:
+                self.xinput_handler.set_ignore_indices(self.ignored_xinput_indices)
+            except Exception:
+                pass
+            
+        self.populate_controller_combo()
+        if hasattr(self, 'nav_controller_combo'):
+            self.populate_any_controller_combo(self.nav_controller_combo)
+
     def on_screen_touched(self):
         self.screen_touched = True  # Set the flag when the screen is touched
 
@@ -630,26 +797,7 @@ class MainWindow(QMainWindow):
         button.setCursor(Qt.PointingHandCursor)
 
     def command_cleaner(self, command):
-        # splitted = command.split("/")
-        # to_replace = ''
-        # for x,piece in enumerate(splitted):
-        #     if ":" in piece and x != 0:
-        #         to_replace += splitted[x].split(" ")[0]
-        #         break
-        #     to_replace += piece+"/"
-        
-        # if " " in to_replace: 
-        #     to_replace_split = to_replace.split("/")
-        #     new = ''
-        #     for x,piece in enumerate(to_replace_split):
-        #         if " " in piece:
-        #             new += f'"{piece}"'+"/"
-        #         elif x != len(to_replace_split) - 1:
-        #             new += piece+"/"
-        #         else:
-        #             new += piece
-        #     command = command.replace(to_replace, new)
-
+        vcontroller = str(self.preferred_controller_idx)
         if "?" in command:
             commandsplt = command.split("?")
             command = commandsplt[0]
@@ -662,7 +810,7 @@ class MainWindow(QMainWindow):
             
             for script in scripts:
                 script = script.split("=")
-                self.run_command(f"{' '.join(script[0].split(':'))} {script[1].replace('emupath', os.path.dirname(command.split('"')[0]))}", popup=False)
+                self.run_command(f"{' '.join(script[0].split(':', 1))} {script[1].replace('emupath', os.path.dirname(command.split('"')[0])).replace('vcontroller',vcontroller)}", popup=False)
                 time.sleep(.5)
         return command.replace("/","\\")
 
@@ -691,8 +839,21 @@ class MainWindow(QMainWindow):
         worker.deleteLater()
 
     def closeEvent(self, event):
-        for worker in self.active_workers:
-            worker.wait()  # Wait for each worker to finish
+        if hasattr(self, "vpad") and self.vpad:
+            try:
+                self.vpad.stop()
+            except Exception as e:
+                print(f"Error stopping vpad: {e}")
+
+        for worker in getattr(self, "active_workers", []):
+            try:
+                worker.wait()
+            except Exception as e:
+                print(f"Error waiting for worker: {e}")
+        # 3. Call parent closeEvent (lets Qt finish teardown)
+        super().closeEvent(event)
+
+        # 4. Explicit accept (optional, Qt usually does this itself if not ignored)
         event.accept()
 
     def display_output(self, output):
@@ -913,8 +1074,30 @@ class MainWindow(QMainWindow):
     def handle_button_b(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
+        if getattr(self, "_shutting_down", False):
+            return
+        self._shutting_down = True
 
-        self.close()
+        # stop generating new UI inputs
+        try:
+            self.xinput_handler.timer.stop()
+        except Exception:
+            pass
+
+        # push a neutral frame so B isn’t stuck “down”, then stop vpad
+        if getattr(self, "vpad", None):
+            try:
+                self.vpad.send_neutral()   # implement: reset+update on the vpad
+            except Exception:
+                pass
+            try:
+                self.vpad.stop()
+            except Exception:
+                pass
+            self.vpad = None
+
+        # optional tiny non-blocking delay (lets OS/app settle)
+        QTimer.singleShot(0, QApplication.quit)  # or a few ms if you insist
 
     def handle_button_y(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
@@ -940,7 +1123,7 @@ class MainWindow(QMainWindow):
             self.toggle_navbar()
 
     def init_xinput_handler(self):
-        self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label, self)
+        self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label, self, ignore_indices=self.ignored_xinput_indices)
         self.xinput_handler.dpad_signal.connect(self.handle_dpad_input)
         self.xinput_handler.button_a_signal.connect(self.handle_button_a)
         self.xinput_handler.button_b_signal.connect(self.handle_button_b)

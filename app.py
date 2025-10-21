@@ -1,8 +1,7 @@
-import sys
-import configparser
 from PyQt5.QtWidgets import QApplication
 from ui_components import MainWindow
-from xinput_handler import XInputHandler
+import configparser
+import sys
 
 def get_boolean_with_default(config, section, option, default=False):
     """
@@ -32,10 +31,6 @@ def main():
     app = QApplication(sys.argv)
     main_window = MainWindow(fullscreen, navbar, sort_by)
     main_window.show()
-
-    # Set up the XInput handler
-    xinput_handler = XInputHandler(main_window.settings_label, main_window.buttons_label, main_window)
-    main_window.init_xinput_handler()  # Ensure DPAD signals are connected
 
     sys.exit(app.exec_())
 
