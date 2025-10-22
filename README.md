@@ -125,6 +125,8 @@ This section goes into detail on how to set everything up in order to get everyt
 
  - Python 3.12+ (could work on older versions it but has not been tested)
  - Python package PyQt5
+ - [ViGEmBus](https://github.com/nefarius/ViGEmBus)_1.22.0 by [nefarius](https://github.com/nefarius) - Only tested the version **included in this repo**
+ - [vgamepad](https://github.com/yannbouteiller/vgamepad) by [yannbouteiller](https://github.com/yannbouteiller) - **Included in this repo**
 
 You can get Python from their official website:
 >https://www.python.org/downloads/
