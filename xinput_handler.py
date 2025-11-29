@@ -2,26 +2,38 @@ from PyQt5.QtCore import QTimer, pyqtSignal, QObject
 from ctypes import wintypes
 import ctypes
 
+import sys
+
 # Load XInput library
-xinput = ctypes.windll.xinput1_4
+if sys.platform == 'win32':
+    xinput = ctypes.windll.xinput1_4
+    
+    # Define XInput structures and constants
+    class XInputGamepad(ctypes.Structure):
+        _fields_ = [
+            ('wButtons', wintypes.WORD),
+            ('bLeftTrigger', wintypes.BYTE),
+            ('bRightTrigger', wintypes.BYTE),
+            ('sThumbLX', wintypes.SHORT),
+            ('sThumbLY', wintypes.SHORT),
+            ('sThumbRX', wintypes.SHORT),
+            ('sThumbRY', wintypes.SHORT)
+        ]
 
-# Define XInput structures and constants
-class XInputGamepad(ctypes.Structure):
-    _fields_ = [
-        ('wButtons', wintypes.WORD),
-        ('bLeftTrigger', wintypes.BYTE),
-        ('bRightTrigger', wintypes.BYTE),
-        ('sThumbLX', wintypes.SHORT),
-        ('sThumbLY', wintypes.SHORT),
-        ('sThumbRX', wintypes.SHORT),
-        ('sThumbRY', wintypes.SHORT)
-    ]
-
-class XInputState(ctypes.Structure):
-    _fields_ = [
-        ('dwPacketNumber', wintypes.DWORD),
-        ('Gamepad', XInputGamepad)
-    ]
+    class XInputState(ctypes.Structure):
+        _fields_ = [
+            ('dwPacketNumber', wintypes.DWORD),
+            ('Gamepad', XInputGamepad)
+        ]
+else:
+    xinput = None
+    
+    # Dummy structures for non-Windows
+    class XInputGamepad:
+        pass
+        
+    class XInputState:
+        pass
 
 ERROR_SUCCESS = 0
 BUTTONS = {
@@ -48,6 +60,9 @@ class XInputHandler(QObject):
     button_y_signal = pyqtSignal()
     button_x_signal = pyqtSignal()
     button_start_signal = pyqtSignal()
+    button_back_signal = pyqtSignal()
+    button_lb_signal = pyqtSignal()
+    button_rb_signal = pyqtSignal()
 
     def __init__(self, settings_label, buttons_label, window, ignore_indices=None):
         super().__init__()
@@ -74,6 +89,11 @@ class XInputHandler(QObject):
     def check_xinput_events(self):
         if not self.window.isActiveWindow():
             return  # remove this line if you want inputs even when window isn't focused
+
+        if xinput is None:
+            self.settings_label.setText("XInput not supported on this platform")
+            self.buttons_label.setText("")
+            return
 
         any_controller_connected = False
         all_pressed_buttons = []
@@ -107,6 +127,12 @@ class XInputHandler(QObject):
                         self.button_y_signal.emit()
                     if state.Gamepad.wButtons & 0x0010:
                         self.button_start_signal.emit()
+                    if state.Gamepad.wButtons & 0x0020:
+                        self.button_back_signal.emit()
+                    if state.Gamepad.wButtons & 0x0100:
+                        self.button_lb_signal.emit()
+                    if state.Gamepad.wButtons & 0x0200:
+                        self.button_rb_signal.emit()
 
         # Prefix the status label with virtual status (enabled + slot list) 
         prefix = self._virtual_status_text()
