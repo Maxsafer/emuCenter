@@ -323,7 +323,7 @@ class MainWindow(QMainWindow):
         # Initialize navigation sound
         self.nav_sound = QSoundEffect()
         self.nav_sound.setSource(QUrl.fromLocalFile("./sounds/navigation-sfx.wav"))
-        self.nav_volume = self.config.getint('MainWindow', 'nav_sound_volume', fallback=50)
+        self.nav_volume = self.config.getint('MainWindow', 'nav_sound_volume', fallback=75)
         self.nav_sound.setVolume(self.nav_volume / 100.0)
         
         # Favorites system
@@ -661,7 +661,7 @@ class MainWindow(QMainWindow):
         self.vpad_checkbox.stateChanged.connect(self.on_vpad_checkbox_changed)
 
         self.controller_label = QLabel("Enable a primary controller?")
-        self.controller_label.setFont(QFont("Arial", 18))
+        self.controller_label.setFont(QFont("Arial", 18, QFont.Bold))
         self.controller_label.setStyleSheet("color: white;")
 
         self.controller_combo = TransparentComboBox()
@@ -1051,7 +1051,7 @@ class MainWindow(QMainWindow):
 
     def add_emulator_section(self, layout, label_text, exe_key, games_key, button_label):
         label = QLabel(f"\n{label_text}")
-        label.setFont(QFont("Arial", 18))
+        label.setFont(QFont("Arial", 18, QFont.Bold))
         label.setStyleSheet("color: white;")
         exe_path_label = QLabel(f"Emulator path: {self.get_emulator_path(exe_key)}")
         exe_path_label.setFont(QFont("Arial", 10))
@@ -1065,6 +1065,18 @@ class MainWindow(QMainWindow):
         games_button = QPushButton("Games")
         self.style_button(exe_button)
         self.style_button(games_button)
+        
+        # Set minimum size to ensure rounded corners are visible
+        exe_button.setMinimumHeight(50)
+        exe_button.setMinimumWidth(120)
+        exe_button.setFont(QFont("Arial", 10))
+        games_button.setMinimumHeight(50)
+        games_button.setMinimumWidth(120)
+        games_button.setFont(QFont("Arial", 10))
+        
+        exe_button.setCursor(Qt.PointingHandCursor)
+        games_button.setCursor(Qt.PointingHandCursor)
+        
         exe_button.clicked.connect(lambda: self.select_exe(exe_key, f"Select {button_label}", exe_path_label))
         games_button.clicked.connect(lambda: self.select_folder(games_key, "Select Games Folder", games_path_label))
 
