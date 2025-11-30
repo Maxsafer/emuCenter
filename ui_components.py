@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QLabel, QWidget, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QMainWindow, QAction, QDesktopWidget, QApplication, QCheckBox, QFileDialog, QScrollArea, QGridLayout, QScroller, QDialog, QShortcut, QMenu, QTextEdit, QComboBox, QListView, QGraphicsDropShadowEffect, QSlider
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QKeySequence, QRegion, QPainterPath
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl, QRunnable, QThreadPool, QObject, pyqtSlot
+from functools import lru_cache
 from PyQt5.QtMultimedia import QSoundEffect
 from xinput_handler import XInputHandler
 from xinput_utils import xinput_connected_indices
@@ -119,6 +120,55 @@ class Worker(QThread):
         self.process.wait()
         self.finished_signal.emit()
 
+class ImageCache:
+    def __init__(self):
+        self.cache = {}
+
+    def get(self, key):
+        return self.cache.get(key)
+
+    def put(self, key, pixmap):
+        self.cache[key] = pixmap
+
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    result = pyqtSignal(object)
+
+class ImageLoader(QRunnable):
+    def __init__(self, path, size, mode='inner'):
+        super(ImageLoader, self).__init__()
+        self.path = path
+        self.size = size
+        self.mode = mode # 'inner' or 'button'
+        self.signals = WorkerSignals()
+
+    @pyqtSlot()
+    def run(self):
+        try:
+            if not os.path.exists(self.path):
+                self.signals.result.emit(None)
+                return
+
+            pixmap = QPixmap(self.path)
+            if pixmap.isNull():
+                self.signals.result.emit(None)
+                return
+
+            if self.mode == 'inner':
+                # Scale for inner button content (keep aspect ratio by expanding)
+                scaled_pixmap = pixmap.scaled(self.size, self.size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            else:
+                # Scale for other uses if needed
+                scaled_pixmap = pixmap.scaled(self.size, self.size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            self.signals.result.emit(scaled_pixmap)
+        except Exception as e:
+            print(f"Error loading image {self.path}: {e}")
+            self.signals.result.emit(None)
+        finally:
+            self.signals.finished.emit()
+
+
 class QHLine(QFrame):
     def __init__(self):
         super(QHLine, self).__init__()
@@ -223,7 +273,7 @@ class MainWindow(QMainWindow):
         self.selected_col = -1  # Track the selected column in the grid
         self.show_all_overlays = False # Flag to toggle game overlays
         self.games_in_grid = []  # Track the games in the grid layout
-        self.screen_touched = False  # Flag to track if the screen was touched
+        self.screen_touched = True  # Flag to track if the screen was touched (default to True for touch-first experience)
 
         self.config.read(file_path)
         self.vpad_enabled = self.config.getboolean('MainWindow', 'virtual_controller', fallback=True)
@@ -282,6 +332,10 @@ class MainWindow(QMainWindow):
         self.load_favorites()  # Load favorites from settings.ini
         
         self.game_cache = {}  # Cache for sorted game lists
+        
+        # Image loading optimization
+        self.thread_pool = QThreadPool()
+        self.image_cache = ImageCache()
 
         self.init_ui()
         self._blocker = Blocker(self)
@@ -585,7 +639,7 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(self.fullscreen_checkbox)
         settings_layout.addWidget(self.navbar_checkbox)
         
-        self.simplified_ui_checkbox = QCheckBox("Simplified UI (disable background images for better performance)")
+        self.simplified_ui_checkbox = QCheckBox("Simplified UI (disables game covers for better performance)")
         self.simplified_ui_checkbox.setFont(QFont("Arial", 18))
         self.simplified_ui_checkbox.setStyleSheet("color: white;")
         self.simplified_ui_checkbox.setChecked(self.simplified_ui)
@@ -706,7 +760,8 @@ class MainWindow(QMainWindow):
 
         nav_button1.clicked.connect(lambda: (self.stacked_widget.setCurrentWidget(home_widget),
                                      self.populate_controller_combo(),
-                                     self.populate_any_controller_combo(self.nav_controller_combo)))
+                                     self.populate_any_controller_combo(self.nav_controller_combo),
+                                     self.reset_selection_mode()))
         
         nav_button2.clicked.connect(lambda: (self.populate_controller_combo(),
                                      self.populate_any_controller_combo(self.nav_controller_combo),
@@ -1345,16 +1400,24 @@ class MainWindow(QMainWindow):
             padding = 8
             inner_size = button_size - (padding * 2)
             
-            # Load and scale the background image
-            bg_pixmap = QPixmap(game_bg_path)
-            scaled_bg_pixmap = bg_pixmap.scaled(inner_size, inner_size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            
             # Create a background label that covers the inner area
             bg_label = QLabel(button)
-            bg_label.setPixmap(scaled_bg_pixmap)
-            bg_label.setScaledContents(True)
             bg_label.setGeometry(padding, padding, inner_size, inner_size)
+            bg_label.setScaledContents(True)
             bg_label.lower()  # Send to back
+
+            # Check cache first
+            cache_key = (game_bg_path, inner_size)
+            cached_pixmap = self.image_cache.get(cache_key)
+
+            if cached_pixmap:
+                bg_label.setPixmap(cached_pixmap)
+            else:
+                # Async load
+                loader = ImageLoader(game_bg_path, inner_size, mode='inner')
+                # We use a default arg for bg_label to capture it in the lambda closure correctly
+                loader.signals.result.connect(lambda p, l=bg_label, k=cache_key: self.on_image_loaded(p, l, k))
+                self.thread_pool.start(loader)
             
             # Apply rounded corner mask to the inner image
             inner_path = QPainterPath()
@@ -1413,6 +1476,7 @@ class MainWindow(QMainWindow):
             # Use default styling
             button.has_bg_image = False
             self.style_button(button)
+
 
         # Create a QLabel for the emulator logo
         emu = self.set_emulator(self.find_exec(game_name).lower())
@@ -1494,6 +1558,14 @@ class MainWindow(QMainWindow):
 
         self.grid_layout.addWidget(button, row, col)
         return button
+
+    def on_image_loaded(self, pixmap, bg_label, cache_key):
+        try:
+            if pixmap:
+                bg_label.setPixmap(pixmap)
+                self.image_cache.put(cache_key, pixmap)
+        except RuntimeError:
+            pass # Widget deleted
 
     def resizeEvent(self, event):
         self.recalculate_grid_layout()
@@ -1659,6 +1731,9 @@ class MainWindow(QMainWindow):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
         self.setFrozen(False)
+        # Unlock touch mode and hide selection, but keep selected_row/col for memory
+        self.screen_touched = True
+        self.highlight_selected_game()
 
     def handle_button_b(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
@@ -1697,10 +1772,12 @@ class MainWindow(QMainWindow):
         else:
             self.update_sort_by_setting('alphabetical')
 
-        # Reset selected game to the first one
-        self.selected_row = 0
-        self.selected_col = 0
-        self.highlight_selected_game()
+        # Do NOT reset selection or force controller mode here
+        # The update_sort_by_setting will handle resetting to "no selection"
+        # self.screen_touched = False 
+        # self.selected_row = 0
+        # self.selected_col = 0
+        # self.highlight_selected_game()
 
     def handle_button_start(self):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
@@ -1720,12 +1797,14 @@ class MainWindow(QMainWindow):
         """Handle Left Bumper - toggle between main and favorites grid"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
+        # self.screen_touched = False # Removed
         self.toggle_grid_view(tab='main')
     
     def handle_button_rb(self):
         """Handle Right Bumper - toggle between main and favorites grid"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
+        # self.screen_touched = False # Removed
         self.toggle_grid_view(tab='favs')
 
     def init_xinput_handler(self):
@@ -1743,10 +1822,10 @@ class MainWindow(QMainWindow):
     def update_sort_by_setting(self, sort_by_value):
         self.update_settings('MainWindow', 'sort_by', sort_by_value)
         self.sort_by = sort_by_value
-        self.selected_row = 0  # Reset the selected row
-        self.selected_col = 0  # Reset the selected column
+        
+        self.reset_selection_mode()
+            
         self.recalculate_grid_layout()
-        self.highlight_selected_game()
 
     def toggle_navbar(self):
         if self.nav_widget.isVisible():
@@ -1768,6 +1847,7 @@ class MainWindow(QMainWindow):
         cleaned_name = ' '.join(cleaned_name.split())
         return cleaned_name
 
+    @lru_cache(maxsize=1024)
     def find_background_image(self, game_name):
         """
         Finds the best matching background image for a given game name.
@@ -1927,10 +2007,8 @@ class MainWindow(QMainWindow):
             return  # Already on favorites
         
         self.current_grid = 'favorites'
-        self.selected_row = 0
-        self.selected_col = 0
+        self.reset_selection_mode()
         self.recalculate_grid_layout()
-        self.highlight_selected_game()
     
     def switch_to_main(self):
         """Switch to main grid view"""
@@ -1938,10 +2016,8 @@ class MainWindow(QMainWindow):
             return  # Already on main
         
         self.current_grid = 'main'
-        self.selected_row = 0
-        self.selected_col = 0
+        self.reset_selection_mode()
         self.recalculate_grid_layout()
-        self.highlight_selected_game()
     
     def toggle_grid_view(self, tab: str):
         """Toggle between main and favorites grid"""
@@ -1949,6 +2025,15 @@ class MainWindow(QMainWindow):
             self.switch_to_favorites()
         else:
             self.switch_to_main()
+
+    def reset_selection_mode(self):
+        """Reset selection to touch mode (no highlight)"""
+        self.screen_touched = True
+        self.selected_row = -1
+        self.selected_col = -1
+        self.setFrozen(False)  # Unlock touch input
+        self.highlight_selected_game()
+        self.grid_scroll_area.verticalScrollBar().setValue(0)
 
     def restart(self):
         QApplication.quit()  # Close the current instance of the application

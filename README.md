@@ -274,6 +274,9 @@ Most of the emulators can configure an exit hotkey/shortcut. I have configured o
 **Virtual Gamepad** <br>
 I added the option to enable a virtual gamepad mostly for handhelds, this way you can set the vritual gamepad as the controller for most emulators beforehand and just have it picked up as you launch games from EmuCenter. This has been super handy with Dolphin and YUZU/EDEN.
 
+**Why block touch controls/mouse on dpad use** <br>
+This is specifically made for handhelds/systems that have joystick to mouse bindings, this way there is no double input. Pressing `X` to unlock seems like really easy and fast to use.
+
 **Closing EmuCenter** <br>
 When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a controller pressing "B".
 
