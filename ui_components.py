@@ -721,7 +721,7 @@ class MainWindow(QMainWindow):
         about_layout = QVBoxLayout()
 
         # About label
-        about_label = QLabel("EmuCenter version 1.1")
+        about_label = QLabel("EmuCenter version 2.0.0")
         about_label.setFont(QFont("Arial", 24, QFont.Bold))
         about_label.setAlignment(Qt.AlignLeft)
         about_label.setStyleSheet("color: white;")
@@ -730,28 +730,20 @@ class MainWindow(QMainWindow):
         # Text box for additional information
         info_text_edit = QTextEdit()
         info_text_edit.setFont(QFont("Arial", 16))
-        info_text_edit.setStyleSheet("color: white; background-color: #303030;")
+        info_text_edit.setStyleSheet("color: white; background-color: rgba(255, 255, 255, 5)")
         info_text_edit.setReadOnly(True)  # Make the text box read-only
         info_text_edit.setText(
-            "EmuCenter is a powerful emulator front-end designed to provide a seamless experience for managing and launching your favorite games.\n\n"
-            "Features:\n"
-            "- Customizable templates for emulators\n"
-            "- User scalable\n"
-            "- XInput controller support\n"
-            "- Touch support\n"
-            "- Sorting by alphabetical order or emulator\n"
-            "- Fullscreen mode\n"
-            "- Customizable game grid\n\n"
-        
-            "For more information/documentation, visit https://github.com/Maxsafer/emuCenter\n"
-            "Developed with love by Maxsafer aka classman."
+            "EmuCenter version 2.0.0 is a powerful emulator front-end designed to provide a seamless experience for managing and launching your favorite games.\n\n"
+            "For more information/documentation, visit    https://github.com/Maxsafer/emuCenter\n"
+
+            "Developed with love by Maxsafer, aka classman."
         )
         about_layout.addWidget(info_text_edit)
 
         about_widget.setLayout(about_layout)
         about_widget.setAutoFillBackground(True)
         about_palette = about_widget.palette()
-        about_palette.setColor(QPalette.Window, QColor(30, 30, 30))
+        about_palette.setColor(QPalette.Window, QColor(255, 255, 255, 5))
         about_widget.setPalette(about_palette)
 
         self.stacked_widget.addWidget(home_widget)
