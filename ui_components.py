@@ -904,8 +904,9 @@ class MainWindow(QMainWindow):
         for key, value in self.config.items('MainWindow'):
             if "exclude" in key:
                 excluded_extensions = value.replace(" ","").split(",")
+                break
             else:
-                excluded_extensions = [".bin",".sav",".txt","shortcuts",".sgm",".srm"]
+                excluded_extensions = [".bin",".sav",".txt","shortcuts",".sgm",".srm","backups"]
 
 
         for key, value in self.config.items('Emulators'):
