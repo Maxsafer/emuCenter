@@ -75,6 +75,8 @@ class XInputHandler(QObject):
         self.timer.timeout.connect(self.check_xinput_events)
         self.timer.start(100)
 
+        self.prev_gamepad_buttons = [0] * 4
+
     def set_ignore_indices(self, indices):
         s = set(indices or [])
         self.ignore_indices = set() if len(s) >= 4 else s
@@ -105,34 +107,49 @@ class XInputHandler(QObject):
                 any_controller_connected = True
 
                 # Build the per-line label, mark the virtual (ignored) slot
-                pressed_buttons = self.get_pressed_buttons(state.Gamepad.wButtons)
+                pressed_buttons_text = self.get_pressed_buttons(state.Gamepad.wButtons)
                 if controller_id in self.ignore_indices:
-                    line = f"Aggregator ({controller_id}): {pressed_buttons}"
+                    line = f"Aggregator ({controller_id}): {pressed_buttons_text}"
                 else:
-                    line = f"Controller ({controller_id}): {pressed_buttons}"
+                    line = f"Controller ({controller_id}): {pressed_buttons_text}"
                 all_pressed_buttons.append(line)
 
                 # Only drive UI actions from NON-ignored slots
                 if controller_id not in self.ignore_indices:
-                    dpad_state = self.get_dpad_state(state.Gamepad.wButtons)
+                    current_buttons = state.Gamepad.wButtons
+                    prev_buttons = self.prev_gamepad_buttons[controller_id]
+                    
+                    # Calculate buttons that were just pressed (rising edge)
+                    # (current & ~prev) gives bits that are 1 now but were 0 before
+                    just_pressed = current_buttons & ~prev_buttons
+                    
+                    dpad_state = self.get_dpad_state(current_buttons)
                     if dpad_state:
                         self.dpad_signal.emit(dpad_state)
-                    if state.Gamepad.wButtons & 0x1000:
+                        
+                    # Use just_pressed for action buttons to prevent spamming
+                    if just_pressed & 0x1000:
                         self.button_a_signal.emit()
-                    if state.Gamepad.wButtons & 0x2000:
+                    if just_pressed & 0x2000:
                         self.button_b_signal.emit()
-                    if state.Gamepad.wButtons & 0x4000:
+                    if just_pressed & 0x4000:
                         self.button_x_signal.emit()
-                    if state.Gamepad.wButtons & 0x8000:
+                    if just_pressed & 0x8000:
                         self.button_y_signal.emit()
-                    if state.Gamepad.wButtons & 0x0010:
+                    if just_pressed & 0x0010:
                         self.button_start_signal.emit()
-                    if state.Gamepad.wButtons & 0x0020:
+                    if just_pressed & 0x0020:
                         self.button_back_signal.emit()
-                    if state.Gamepad.wButtons & 0x0100:
+                    if just_pressed & 0x0100:
                         self.button_lb_signal.emit()
-                    if state.Gamepad.wButtons & 0x0200:
+                    if just_pressed & 0x0200:
                         self.button_rb_signal.emit()
+                        
+                    # Update previous state
+                    self.prev_gamepad_buttons[controller_id] = current_buttons
+            else:
+                # Reset previous state if controller disconnected
+                self.prev_gamepad_buttons[controller_id] = 0
 
         # Prefix the status label with virtual status (enabled + slot list) 
         virtual_status = self._virtual_status_text()
