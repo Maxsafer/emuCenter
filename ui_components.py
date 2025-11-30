@@ -219,8 +219,9 @@ class MainWindow(QMainWindow):
         self.CACHE_FILE = 'games_cache.json'
         self.config = configparser.ConfigParser()
         file_path = 'settings.ini'
-        self.selected_row = 0  # Track the selected row in the grid
-        self.selected_col = 0  # Track the selected column in the grid
+        self.selected_row = -1  # Track the selected row in the grid
+        self.selected_col = -1  # Track the selected column in the grid
+        self.show_all_overlays = False # Flag to toggle game overlays
         self.games_in_grid = []  # Track the games in the grid layout
         self.screen_touched = False  # Flag to track if the screen was touched
 
@@ -415,7 +416,7 @@ class MainWindow(QMainWindow):
         self.nav_controller_combo.setView(QListView())
         self.nav_controller_combo.view().setMinimumWidth(self.centralWidget().width())
         
-        dynamic_font_size = self.centralWidget().width() // 40
+        dynamic_font_size = self.centralWidget().width() // 30
         self.nav_controller_combo.setStyleSheet(f"""
             QComboBox {{
                 background-color: rgba(255, 255, 255, 10);
@@ -645,6 +646,7 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(self.controller_combo)
         settings_layout.addWidget(self.vpad_checkbox)
         settings_layout.addWidget(self.buttons_label)
+        settings_layout.addWidget(self.settings_label)
 
         settings_layout.addWidget(self.emulator_label)
 
@@ -653,7 +655,6 @@ class MainWindow(QMainWindow):
         for emulator in self.emulators:
             self.add_emulator_section(settings_layout, f"{emulator.upper()} ({emulators_desc.get(emulator)})", f'{emulator.lower()}Path', f'{emulator.lower()}GamesPath', f"{emulator}")
 
-        settings_layout.addWidget(self.settings_label)
         settings_layout.addStretch(1)  # Add stretch to push items to the top
         settings_widget.setLayout(settings_layout)
         settings_widget.setAutoFillBackground(True)
@@ -1207,6 +1208,45 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Failed to save game cache: {e}")
 
+    def _create_emulator_header_box(self, emulator_name, size):
+        """Create a visual emulator header box with icon if image exists."""
+        icon_path = f"./images/{emulator_name}.png"
+        
+        if not os.path.exists(icon_path):
+            return None
+        
+        # Create container label styled like a game button
+        container = QLabel()
+        container.setFixedSize(round(size/2), round(size/2))
+        container.setStyleSheet("""
+            QLabel {
+                background-color: rgba(255, 255, 255, 2);
+                border: 1px solid rgba(255, 255, 255, 15);
+                border-radius: 20px;
+            }
+        """)
+        
+        # Apply rounded corner mask
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, size, size, 20, 20)
+        container.setMask(QRegion(path.toFillPolygon().toPolygon()))
+        
+        # Create layout for the container
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Load and add emulator icon
+        pixmap = QPixmap(icon_path)
+        icon_size = int(size * 0.2)
+        scaled_pixmap = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        
+        icon_label = QLabel()
+        icon_label.setPixmap(scaled_pixmap)
+        icon_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(icon_label)
+        
+        return container
+
     def recalculate_grid_layout(self):
         if not self.games_loaded:
             return
@@ -1242,13 +1282,25 @@ class MainWindow(QMainWindow):
                     row += 1
                     self.grid_layout.addWidget(QHLine(), row, col, 1, 5)
                     current_letter = first_letter
-                    label = QLabel(current_letter)
-                    if self.sort_by == 'alphabetical':
-                        label.setFont(QFont("Arial", 35, QFont.Bold))
+                    
+                    # Try to create emulator header box if sorting by emulator
+                    header_widget = None
+                    if self.sort_by == 'emulator':
+                        header_widget = self._create_emulator_header_box(current_letter, button_size)
+                    
+                    if header_widget:
+                        # Use emulator icon box
+                        self.grid_layout.addWidget(header_widget, row, col, Qt.AlignCenter)
                     else:
-                        label.setFont(QFont("Arial", (window_width // 30) - button_margin * 2, QFont.Bold))
-                    label.setStyleSheet("color: white;")
-                    self.grid_layout.addWidget(label, row, col, Qt.AlignCenter)
+                        # Use text label (fallback or alphabetical sort)
+                        label = QLabel(current_letter)
+                        if self.sort_by == 'alphabetical':
+                            label.setFont(QFont("Arial", 35, QFont.Bold))
+                        else:
+                            label.setFont(QFont("Arial", (window_width // 30) - button_margin * 2, QFont.Bold))
+                        label.setStyleSheet("color: white;")
+                        self.grid_layout.addWidget(label, row, col, Qt.AlignCenter)
+                    
                     col += 1
                     self.games_in_grid.append([])  # Add new row for letter/emulator
                     self.row_offsets.append(1)     # This row has an offset of 1 (label takes first slot)
@@ -1431,6 +1483,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(text_container)
         button.setLayout(layout)
         
+        # Hide overlay elements by default if button has background image
+        if button.has_bg_image:
+            background_label.hide()
+            text_container.hide()
+        
         # Store references for visibility toggling
         button.emulator_label = background_label
         button.text_container = text_container
@@ -1455,8 +1512,12 @@ class MainWindow(QMainWindow):
             self.handle_button_a()
         elif event.key() == Qt.Key_F:
             self.handle_button_back()
-        elif event.key() == Qt.Key_Q or event.key() == Qt.Key_E:
+        elif event.key() == Qt.Key_R:
+            self.handle_button_start()
+        elif event.key() == Qt.Key_Q:
             self.handle_button_lb()
+        elif event.key() == Qt.Key_E:
+            self.handle_button_rb()
         elif event.key() == Qt.Key_Space:
             self.handle_button_x()
         else:
@@ -1469,23 +1530,33 @@ class MainWindow(QMainWindow):
         if not self.games_in_grid:
             return  # If there are no games in the grid, do nothing
         
-        if self.screen_touched:
-            return  # Do not snap to the selected game if the screen was touched
-        
         for row in range(len(self.games_in_grid)):
             for col in range(len(self.games_in_grid[row])):
                 button = self.games_in_grid[row][col]
-                if (row, col) == (self.selected_row, self.selected_col):
-                    # Check if button has background image
-                    if hasattr(button, 'has_bg_image') and button.has_bg_image:
-                        # Darken the overlay and show the yellow border
+                is_selected = (row, col) == (self.selected_row, self.selected_col)
+                
+                if hasattr(button, 'has_bg_image') and button.has_bg_image:
+                    # Determine if overlay should be shown
+                    # Show if global toggle is on OR (selected AND not touched)
+                    should_show_overlay = self.show_all_overlays or (is_selected and not self.screen_touched)
+                    
+                    if should_show_overlay:
                         button.overlay_widget.setStyleSheet("background-color: rgba(0, 0, 0, 100);")
-                        button.border_widget.show()
-                        # Show text and icon when selected
                         if hasattr(button, 'emulator_label'): button.emulator_label.show()
                         if hasattr(button, 'text_container'): button.text_container.show()
                     else:
-                        # Use default selection styling for buttons without background images
+                        button.overlay_widget.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
+                        if hasattr(button, 'emulator_label'): button.emulator_label.hide()
+                        if hasattr(button, 'text_container'): button.text_container.hide()
+                        
+                    # Selection border (only if selected and not touched)
+                    if is_selected and not self.screen_touched:
+                        button.border_widget.show()
+                    else:
+                        button.border_widget.hide()
+                else:
+                    # Default button styling
+                    if is_selected and not self.screen_touched:
                         button.setStyleSheet("""
                             QPushButton {
                                 background-color: transparent;
@@ -1496,22 +1567,13 @@ class MainWindow(QMainWindow):
                                 border-radius: 20px;
                             }
                         """)
-                else:
-                    # Reset to normal state
-                    if hasattr(button, 'has_bg_image') and button.has_bg_image:
-                        # Reset overlay to transparent and hide border
-                        button.overlay_widget.setStyleSheet("background-color: rgba(0, 0, 0, 0);")
-                        button.border_widget.hide()
-                        # Hide text and icon when not selected
-                        if hasattr(button, 'emulator_label'): button.emulator_label.hide()
-                        if hasattr(button, 'text_container'): button.text_container.hide()
                     else:
-                        # Use default styling for buttons without background images
                         self.style_button(button)
 
         # Ensure the selected game button is visible within the scroll area
-        selected_button = self.games_in_grid[self.selected_row][self.selected_col]
-        self.grid_scroll_area.ensureWidgetVisible(selected_button)
+        if not self.screen_touched and self.selected_row != -1:
+            selected_button = self.games_in_grid[self.selected_row][self.selected_col]
+            self.grid_scroll_area.ensureWidgetVisible(selected_button)
 
     def setFrozen(self, freeze: bool):
         if freeze:
@@ -1532,6 +1594,12 @@ class MainWindow(QMainWindow):
         # Reset the screen_touched flag since a controller input was detected
         self.screen_touched = False
         self.setFrozen(True)
+
+        if self.selected_row == -1:
+            self.selected_row = 0
+            self.selected_col = 0
+            self.highlight_selected_game()
+            return
 
         current_row_games = self.games_in_grid[self.selected_row]
         current_col_max = len(current_row_games) - 1
@@ -1638,10 +1706,9 @@ class MainWindow(QMainWindow):
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
         
-        if self.nav_widget.isVisible():
-            self.toggle_navbar()
-        else:
-            self.toggle_navbar()
+        
+        self.show_all_overlays = not self.show_all_overlays
+        self.highlight_selected_game()
     
     def handle_button_back(self):
         """Handle Back/Select button - toggle favorite for selected game"""
@@ -1653,13 +1720,13 @@ class MainWindow(QMainWindow):
         """Handle Left Bumper - toggle between main and favorites grid"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
-        self.toggle_grid_view()
+        self.toggle_grid_view(tab='main')
     
     def handle_button_rb(self):
         """Handle Right Bumper - toggle between main and favorites grid"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
-        self.toggle_grid_view()
+        self.toggle_grid_view(tab='favs')
 
     def init_xinput_handler(self):
         self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label, self, ignore_indices=self.ignored_xinput_indices)
@@ -1876,9 +1943,9 @@ class MainWindow(QMainWindow):
         self.recalculate_grid_layout()
         self.highlight_selected_game()
     
-    def toggle_grid_view(self):
+    def toggle_grid_view(self, tab: str):
         """Toggle between main and favorites grid"""
-        if self.current_grid == 'main':
+        if tab == 'favs':
             self.switch_to_favorites()
         else:
             self.switch_to_main()

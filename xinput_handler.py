@@ -81,14 +81,14 @@ class XInputHandler(QObject):
 
     def _virtual_status_text(self):
         if not self.ignore_indices:
-            return "Virtual controller: disabled"
+            return "Virtual controller: disabled\n"
         # could be more than one in theory, so show all
         slots_txt = ", ".join(str(i) for i in sorted(self.ignore_indices))
-        return f"Virtual controller: enabled (slot {slots_txt})"
+        return f"Virtual controller: enabled (slot {slots_txt})\n"
 
     def check_xinput_events(self):
         if not self.window.isActiveWindow():
-            return  # remove this line if you want inputs even when window isn't focused
+            return  # inputs blocked when window isn't focused
 
         if xinput is None:
             self.settings_label.setText("XInput not supported on this platform")
@@ -135,14 +135,18 @@ class XInputHandler(QObject):
                         self.button_rb_signal.emit()
 
         # Prefix the status label with virtual status (enabled + slot list) 
-        prefix = self._virtual_status_text()
+        virtual_status = self._virtual_status_text()
 
         if any_controller_connected:
-            self.settings_label.setText(prefix + "\nController(s) connected")
-            self.buttons_label.setText("\n".join(all_pressed_buttons) if all_pressed_buttons else "No buttons pressed")
+            header_text = "CONTROLLER(S) CONNECTED\n" + virtual_status
+            body_text = "\n".join(all_pressed_buttons) if all_pressed_buttons else "No buttons pressed"
         else:
-            self.settings_label.setText(prefix + "\nNo controllers connected")
-            self.buttons_label.setText("")
+            header_text = "NO CONTROLLER(S) CONNECTED\n" + virtual_status
+            body_text = ""
+
+        # buttons_label is the top label, settings_label is the bottom label
+        self.buttons_label.setText(header_text)
+        self.settings_label.setText(body_text)
     def get_pressed_buttons(self, wButtons):
         pressed_buttons = [name for bitmask, name in BUTTONS.items() if wButtons & bitmask]
         return ", ".join(pressed_buttons) if pressed_buttons else "No buttons pressed"
