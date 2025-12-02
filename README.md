@@ -243,14 +243,20 @@ rpcs3 <br>
 This section is purely to showcase my simplistic looking app.
 
 ### Game Library
-Sorted in alphabetical order:
-![alpha](https://i.imgur.com/88vbVAx.png)
+Sorted by alphabetical order:
+![alpha](https://i.imgur.com/EC3t358.png)
 
 Sorted by emulator:
-![emu](https://i.imgur.com/FOXOL09.png)
+![emu](https://i.imgur.com/Zpj8rIU.png)
 
-Sorted by alphabetical order with simplified UI:
-![alpha](https://i.imgur.com/eTZUT0b.png)
+Sorted by emulator with info cards toggled on:
+![emu](https://i.imgur.com/pJooqYa.png)
+
+Sorted by emulator with simplified UI on (blue are tagged games that will show in favorites):
+![alpha](https://i.imgur.com/m3IVrtw.png)
+
+Recent games tab in order of most recent:
+![alpha](https://i.imgur.com/7AAEWJY.png)
 
 # !! How-to-use
 **Touch and Controller Support** <br>
@@ -264,8 +270,7 @@ Touch controls are set to simply scroll with your finger and tap, although if dp
 |D-PAD|Navigates the game grid to select the desired game to launch|
 |START|Toggles games info cards|
 |SELECT/BACK|Tags a game as a favorite (light blue name box)|
-|RB|Switches to the favorite games tab|
-|LB|Switches to the main tab|
+|LB/RB|Cycles all, favorite and recent games tab|
 
 **Launching/closing games** <br>
 After setting everything up, just tap on the game that you want to launch. 
