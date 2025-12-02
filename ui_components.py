@@ -27,7 +27,7 @@ class CustomMessageBox(QDialog):
         layout = QVBoxLayout()
         self.label = QLabel("Game starting, please be patient.")
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setFont(QFont("Arial", 14, QFont.Bold))
+        self.label.setFont(QFont("Arial", 10, QFont.Bold))
         self.label.setStyleSheet("color: white; background-color: rgba(255,255,255,5);")
         self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0f0c29, stop:0.5 #302b63, stop:1 #24243e);")
         layout.addWidget(self.label)
