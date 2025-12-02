@@ -564,11 +564,11 @@ class MainWindow(QMainWindow):
             }
         """
 
-        self.lt_hint_label = QLabel("LT ◄")
+        self.lt_hint_label = QLabel("LB ◄")
         self.lt_hint_label.setAlignment(Qt.AlignCenter)
         self.lt_hint_label.setStyleSheet(base_hint_style)
 
-        self.rt_hint_label = QLabel("► RT")
+        self.rt_hint_label = QLabel("► RB")
         self.rt_hint_label.setAlignment(Qt.AlignCenter)
         self.rt_hint_label.setStyleSheet(base_hint_style)
 
