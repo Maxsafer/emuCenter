@@ -27,6 +27,9 @@ class CustomMessageBox(QDialog):
         layout = QVBoxLayout()
         self.label = QLabel("Game starting, please be patient.")
         self.label.setAlignment(Qt.AlignCenter)
+        self.label.setFont(QFont("Arial", 14, QFont.Bold))
+        self.label.setStyleSheet("color: white; background-color: rgba(255,255,255,5);")
+        self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0f0c29, stop:0.5 #302b63, stop:1 #24243e);")
         layout.addWidget(self.label)
         self.setLayout(layout)
 
@@ -49,23 +52,23 @@ class ErrorDialog(QDialog):
         
         label = QLabel("The following errors were encountered during initialization:")
         label.setFont(QFont("Arial", 12, QFont.Bold))
-        label.setStyleSheet("color: white;")
+        label.setStyleSheet("color: white; background-color: rgba(255,255,255,0);")
         label.setWordWrap(True)
-        layout.addWidget(label)
         
         # Create a text area to display errors
         error_text = QTextEdit()
         error_text.setReadOnly(True)
         error_text.setFont(QFont("Arial", 10))
-        error_text.setStyleSheet("color: white; background-color: #2a2a2a;")
+        error_text.setStyleSheet("border-radius: 5px; border: none; color: white; background-color: rgba(255,255,255,5);")
         error_text.setText("\n".join(errors))
+        layout.addWidget(label)
         layout.addWidget(error_text)
         
         # Add OK button
         ok_button = QPushButton("OK")
         ok_button.setStyleSheet("""
             QPushButton {
-                background-color: #2a2a2a;
+                background-color: rgba(255,255,255,5);
                 color: white;
                 border: none;
                 padding: 10px;
@@ -73,17 +76,17 @@ class ErrorDialog(QDialog):
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #3a3a3a;
+                background-color: rgba(0,0,0,50);
             }
             QPushButton:pressed {
-                background-color: #1a1a1a;
+                background-color: rgba(0,0,0,150);
             }
         """)
         ok_button.clicked.connect(self.accept)
         layout.addWidget(ok_button)
         
         self.setLayout(layout)
-        self.setStyleSheet("background-color: #303030;")
+        self.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0f0c29, stop:0.5 #302b63, stop:1 #24243e);")
         
         self.exec_()
 
@@ -267,6 +270,7 @@ class MainWindow(QMainWindow):
         self.navbar_visible = navbar
         self.sort_by = sort_by
         self.CACHE_FILE = 'games_cache.json'
+        self.RECENTS_FILE = 'games_recent.json'
         self.config = configparser.ConfigParser()
         file_path = 'settings.ini'
         self.selected_row = -1  # Track the selected row in the grid
@@ -331,6 +335,13 @@ class MainWindow(QMainWindow):
         self.current_grid = 'main'  # Track which grid is displayed ('main' or 'favorites')
         self.load_favorites()  # Load favorites from settings.ini
         
+        self.tabs = [
+            {"key": "main", "label": "ALL"},
+            {"key": "favorites", "label": "FAVORITES"},
+            {"key": "recents", "label": "RECENT"},
+        ]
+        self.current_tab_index = 0
+
         self.game_cache = {}  # Cache for sorted game lists
         
         # Image loading optimization
@@ -344,8 +355,7 @@ class MainWindow(QMainWindow):
         self.init_xinput_handler()
 
     def init_ui(self):
-        self.setWindowTitle('EmuCenter v1.1')
-        # ... (existing code) ...
+        self.setWindowTitle('EmuCenter v2.1.0')
         
         self.setFixedSize(1500, 1000)
         centerPoint = QDesktopWidget().availableGeometry().center()
@@ -518,6 +528,63 @@ class MainWindow(QMainWindow):
         self.nav_layout.addWidget(nav_button2)
         self.nav_layout.addWidget(nav_button4)
         self.nav_layout.addStretch(1)
+
+                # --- Tab indicator (top-right, same line as nav) ---
+        self.tab_indicator_container = QWidget()
+        self.tab_indicator_container.setFixedHeight(60)
+        tab_layout = QHBoxLayout(self.tab_indicator_container)
+        tab_layout.setContentsMargins(14, 10, 14, 10)
+        tab_layout.setSpacing(8)
+
+        # Glass background for the whole pill
+        self.tab_indicator_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(15, 12, 41, 150);
+                border-radius: 22px;
+                border: 1px solid rgba(255, 255, 255, 40);
+            }
+        """)
+
+        # Soft cyan glow for the liquid glass feel
+        glow = QGraphicsDropShadowEffect(self.tab_indicator_container)
+        glow.setBlurRadius(25)
+        glow.setOffset(0, 0)
+        glow.setColor(QColor(0, 255, 255, 80))
+        self.tab_indicator_container.setGraphicsEffect(glow)
+
+        base_hint_style = """
+            QLabel {
+                background-color: rgba(255, 255, 255, 8);
+                color: rgba(255, 255, 255, 220);
+                border-radius: 18px;
+                border: 1px solid rgba(255, 255, 255, 35);
+                padding: 4px 10px;
+                font-family: Arial;
+                font-size: 14px;
+            }
+        """
+
+        self.lt_hint_label = QLabel("LT ◄")
+        self.lt_hint_label.setAlignment(Qt.AlignCenter)
+        self.lt_hint_label.setStyleSheet(base_hint_style)
+
+        self.rt_hint_label = QLabel("► RT")
+        self.rt_hint_label.setAlignment(Qt.AlignCenter)
+        self.rt_hint_label.setStyleSheet(base_hint_style)
+
+        self.tab_labels = []
+
+        tab_layout.addWidget(self.lt_hint_label)
+
+        # Create one label per tab; this will survive future extra tabs
+        for tab in self.tabs:
+            lbl = QLabel(tab["label"])
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setMinimumWidth(80)
+            self.tab_labels.append(lbl)
+            tab_layout.addWidget(lbl)
+
+        tab_layout.addWidget(self.rt_hint_label)
 
         self.nav_widget = QWidget()
         self.nav_widget.setLayout(self.nav_layout)
@@ -721,7 +788,7 @@ class MainWindow(QMainWindow):
         about_layout = QVBoxLayout()
 
         # About label
-        about_label = QLabel("EmuCenter version 2.0.0")
+        about_label = QLabel("EmuCenter v2.1.0")
         about_label.setFont(QFont("Arial", 24, QFont.Bold))
         about_label.setAlignment(Qt.AlignLeft)
         about_label.setStyleSheet("color: white;")
@@ -733,7 +800,7 @@ class MainWindow(QMainWindow):
         info_text_edit.setStyleSheet("color: white; background-color: rgba(255, 255, 255, 5)")
         info_text_edit.setReadOnly(True)  # Make the text box read-only
         info_text_edit.setText(
-            "EmuCenter version 2.0.0 is a powerful emulator front-end designed to provide a seamless experience for managing and launching your favorite games.\n\n"
+            "EmuCenter v2.1.0 is a powerful emulator front-end designed to provide a seamless experience for managing and launching your favorite games.\n\n"
             "For more information/documentation, visit    https://github.com/Maxsafer/emuCenter\n"
 
             "Developed with love by Maxsafer, aka classman."
@@ -765,6 +832,8 @@ class MainWindow(QMainWindow):
         nav_layout.addWidget(self.hamburger_button)
         nav_layout.addWidget(self.nav_widget)
         nav_layout.addStretch(1)
+        # Top-right tab indicator, same line as nav, no new row
+        nav_layout.addWidget(self.tab_indicator_container, alignment=Qt.AlignRight)
 
         main_layout.addLayout(nav_layout)
         main_layout.addWidget(self.stacked_widget)
@@ -786,6 +855,9 @@ class MainWindow(QMainWindow):
         self.games_loaded = True
         self.load_game_cache()
         self.recalculate_grid_layout()
+
+        self.recalculate_grid_layout()
+        self.update_tab_indicator()
         
         # Show error popup if there were any initialization errors
         if self.init_errors:
@@ -1268,16 +1340,106 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Failed to save game cache: {e}")
 
-    def _create_emulator_header_box(self, emulator_name, size):
-        """Create a visual emulator header box with icon if image exists."""
-        icon_path = f"./images/{emulator_name}.png"
+    def load_recents(self):
+        """Load recent games from JSON file. Returns empty list on failure/corruption."""
+        if not os.path.exists(self.RECENTS_FILE):
+            return []
         
-        if not os.path.exists(icon_path):
-            return None
+        try:
+            with open(self.RECENTS_FILE, 'r') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+                return []
+        except Exception as e:
+            print(f"Error loading recents (resetting file): {e}")
+            return []
+
+    def save_recents(self, recents):
+        """Save recent games list to JSON file."""
+        try:
+            with open(self.RECENTS_FILE, 'w') as f:
+                json.dump(recents, f, indent=4)
+        except Exception as e:
+            print(f"Error saving recents: {e}")
+
+    def update_recents(self, game_name):
+        """Update the recents list: add new game to top, remove duplicates, keep max 5."""
+        recents = self.load_recents()
+        
+        # Remove if already exists (to move it to top)
+        if game_name in recents:
+            recents.remove(game_name)
+            
+        # Add to top
+        recents.insert(0, game_name)
+        
+        # Keep only last n
+        recents = recents[:9]
+        
+        self.save_recents(recents)
+
+    def launch_game(self, game_name):
+        """Launch a game and update the recents list."""
+        self.update_recents(game_name)
+        self.run_command(self.command_cleaner(self.find_exec(game_name)), popup=True)
+
+    def _find_tab_index_by_key(self, key: str) -> int:
+        for idx, tab in enumerate(self.tabs):
+            if tab["key"] == key:
+                return idx
+        return 0
+
+    def update_tab_indicator(self):
+        """Refresh the liquid-glass tab indicator to match the current tab."""
+        if not hasattr(self, "tab_labels"):
+            return
+
+        active_idx = self.current_tab_index
+
+        for idx, label in enumerate(self.tab_labels):
+            is_active = (idx == active_idx)
+            if is_active:
+                # Selected tab: brighter, cyan accent
+                label.setStyleSheet("""
+                    QLabel {
+                        background-color: rgba(255, 255, 255, 30);
+                        color: #00faff;
+                        border-radius: 16px;
+                        border: 1px solid rgba(0, 250, 255, 230);
+                        padding: 4px 14px;
+                        font-family: Arial;
+                        font-size: 14px;
+                        font-weight: bold;
+                    }
+                """)
+            else:
+                # Unselected tab: subtle, muted
+                label.setStyleSheet("""
+                    QLabel {
+                        background-color: rgba(255, 255, 255, 10);
+                        color: rgba(255, 255, 255, 200);
+                        border-radius: 16px;
+                        border: 1px solid rgba(255, 255, 255, 40);
+                        padding: 4px 14px;
+                        font-family: Arial;
+                        font-size: 13px;
+                    }
+                """)
+
+    def _create_header_box(self, content_name, size, is_icon=True):
+        """Create a unified header box for both emulator icons and alphabetical letters.
+        
+        Args:
+            content_name: Either emulator name (for icon) or letter (for text)
+            size: Button size to base header dimensions on
+            is_icon: If True, try to load icon; if False or icon missing, display text
+        """
+        box_size = round(size/2)
         
         # Create container label styled like a game button
         container = QLabel()
-        container.setFixedSize(round(size/2), round(size/2))
+        container.setFixedSize(box_size, box_size)
         container.setStyleSheet("""
             QLabel {
                 background-color: rgba(255, 255, 255, 2);
@@ -1288,22 +1450,32 @@ class MainWindow(QMainWindow):
         
         # Apply rounded corner mask
         path = QPainterPath()
-        path.addRoundedRect(0, 0, size, size, 20, 20)
+        path.addRoundedRect(0, 0, box_size, box_size, 20, 20)
         container.setMask(QRegion(path.toFillPolygon().toPolygon()))
         
         # Create layout for the container
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Load and add emulator icon
-        pixmap = QPixmap(icon_path)
-        icon_size = int(size * 0.2)
-        scaled_pixmap = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        
-        icon_label = QLabel()
-        icon_label.setPixmap(scaled_pixmap)
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+        # Try to load icon if requested
+        icon_path = f"./images/{content_name}.png"
+        if is_icon and os.path.exists(icon_path):
+            # Load and add emulator icon
+            pixmap = QPixmap(icon_path)
+            icon_size = int(size * 0.2)
+            scaled_pixmap = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            icon_label = QLabel()
+            icon_label.setPixmap(scaled_pixmap)
+            icon_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(icon_label)
+        else:
+            # Display text (letter or emulator name)
+            text_label = QLabel(content_name)
+            text_label.setFont(QFont("Arial", max(20, box_size // 4), QFont.Bold))
+            text_label.setStyleSheet("color: white;")
+            text_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(text_label)
         
         return container
 
@@ -1327,6 +1499,15 @@ class MainWindow(QMainWindow):
                     filtered_games[first_letter] = favorited
             sorted_games = filtered_games
         
+        # Handle recents mode
+        elif self.current_grid == 'recents':
+            recent_games = self.load_recents()
+            if recent_games:
+                # Create a single category for recents
+                sorted_games = {'recents': recent_games}
+            else:
+                sorted_games = {}
+        
         current_letter = ""
         row = -1  # Start with -1 so the first increment sets it to 0
         col = 0
@@ -1343,23 +1524,16 @@ class MainWindow(QMainWindow):
                     self.grid_layout.addWidget(QHLine(), row, col, 1, 5)
                     current_letter = first_letter
                     
-                    # Try to create emulator header box if sorting by emulator
-                    header_widget = None
-                    if self.sort_by == 'emulator':
-                        header_widget = self._create_emulator_header_box(current_letter, button_size)
+                    # Create unified header box for both emulator and alphabetical sorting
+                    # is_icon=True for emulator sorting, False for alphabetical
+                    header_widget = self._create_header_box(
+                        current_letter, 
+                        button_size, 
+                        is_icon=(self.sort_by == 'emulator' or self.current_grid == 'recents')
+                    )
                     
-                    if header_widget:
-                        # Use emulator icon box
-                        self.grid_layout.addWidget(header_widget, row, col, Qt.AlignCenter)
-                    else:
-                        # Use text label (fallback or alphabetical sort)
-                        label = QLabel(current_letter)
-                        if self.sort_by == 'alphabetical':
-                            label.setFont(QFont("Arial", 35, QFont.Bold))
-                        else:
-                            label.setFont(QFont("Arial", (window_width // 30) - button_margin * 2, QFont.Bold))
-                        label.setStyleSheet("color: white;")
-                        self.grid_layout.addWidget(label, row, col, Qt.AlignCenter)
+                    # Add the header widget to the grid
+                    self.grid_layout.addWidget(header_widget, row, col, Qt.AlignCenter)
                     
                     col += 1
                     self.games_in_grid.append([])  # Add new row for letter/emulator
@@ -1395,7 +1569,7 @@ class MainWindow(QMainWindow):
 
         button = QPushButton()
         button.setFixedSize(button_size, button_size)  # Set fixed size for the button
-        button.clicked.connect(lambda: self.run_command(self.command_cleaner(self.find_exec(game_name)), popup=True))
+        button.clicked.connect(lambda: self.launch_game(game_name))
         
         # Check for custom background image for this game (only if simplified UI is disabled)
         game_bg_path = None if self.simplified_ui else self.find_background_image(game_name)
@@ -1799,18 +1973,26 @@ class MainWindow(QMainWindow):
         self.toggle_favorite()
     
     def handle_button_lb(self):
-        """Handle Left Bumper - toggle between main and favorites grid"""
+        """Handle Left Bumper"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
-        # self.screen_touched = False # Removed
-        self.toggle_grid_view(tab='main')
-    
+        if self.current_grid == 'main':
+            self.toggle_grid_view(tab='recents')
+        elif self.current_grid == 'favorites':
+            self.toggle_grid_view(tab='main')
+        elif self.current_grid == 'recents':
+            self.toggle_grid_view(tab='favorites')
+
     def handle_button_rb(self):
-        """Handle Right Bumper - toggle between main and favorites grid"""
+        """Handle Right Bumper"""
         if self.stacked_widget.currentWidget() != self.stacked_widget.widget(0):
             return
-        # self.screen_touched = False # Removed
-        self.toggle_grid_view(tab='favs')
+        if self.current_grid == 'main':
+            self.toggle_grid_view(tab='favorites')
+        elif self.current_grid == 'favorites':
+            self.toggle_grid_view(tab='recents')
+        elif self.current_grid == 'recents':
+            self.toggle_grid_view(tab='main')
 
     def init_xinput_handler(self):
         self.xinput_handler = XInputHandler(self.settings_label, self.buttons_label, self, ignore_indices=self.ignored_xinput_indices)
@@ -2006,30 +2188,37 @@ class MainWindow(QMainWindow):
                     border-radius: 20px;
                 """)
     
-    def switch_to_favorites(self):
-        """Switch to favorites grid view"""
-        if self.current_grid == 'favorites':
-            return  # Already on favorites
-        
-        self.current_grid = 'favorites'
-        self.reset_selection_mode()
-        self.recalculate_grid_layout()
-    
     def switch_to_main(self):
-        """Switch to main grid view"""
-        if self.current_grid == 'main':
-            return  # Already on main
-        
         self.current_grid = 'main'
+        self.current_tab_index = self._find_tab_index_by_key('main')
         self.reset_selection_mode()
         self.recalculate_grid_layout()
+        self.update_tab_indicator()
+    
+    def switch_to_favorites(self):
+        self.current_grid = 'favorites'
+        self.current_tab_index = self._find_tab_index_by_key('favorites')
+        self.reset_selection_mode()
+        self.recalculate_grid_layout()
+        self.update_tab_indicator()
+
+    def switch_to_recents(self):
+        self.current_grid = 'recents'
+        self.current_tab_index = self._find_tab_index_by_key('recents')
+        self.reset_selection_mode()
+        self.recalculate_grid_layout()
+        self.update_tab_indicator()
     
     def toggle_grid_view(self, tab: str):
-        """Toggle between main and favorites grid"""
-        if tab == 'favs':
-            self.switch_to_favorites()
-        else:
+        """Toggle between grids"""
+        if tab == 'main':
             self.switch_to_main()
+
+        elif tab == 'favorites':
+            self.switch_to_favorites()
+        
+        elif tab == 'recents':
+            self.switch_to_recents()
 
     def reset_selection_mode(self):
         """Reset selection to touch mode (no highlight)"""
