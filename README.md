@@ -23,7 +23,6 @@ I specifically made this for my need of having an emulator game hub for my Ayane
    - [Install EmuCenter](#install-emucenter)
    - [Setting up EmuCenter](#setting-up-emucenter)
 3. [Add more emulators](#-add-more-emulators)
-   - [My personal configuration](#my-personal-configuration)
 4. [Pictures](#-pictures)
 5. [How to use](#-how-to-use)
 6. [Future development](#-future-development)
