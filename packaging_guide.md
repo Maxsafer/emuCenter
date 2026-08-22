@@ -1,184 +1,113 @@
 # Electron Packaging Runbook
 
-This guide documents the specific steps and configurations required to successfully package the Expo/Next.js application with Electron, highlighting critical fixes for common issues encountered during the process.
+How to package EmuCenter (Expo web frontend + Express backend + Electron shell)
+into a runnable Windows build, and why the configuration looks the way it does.
 
-## 1. Core Configuration
+## TL;DR
 
-### Dependencies
-Ensure the following are installed:
 ```bash
-npm install --save-dev electron electron-builder electron-packager
-npm install electron-serve
+npm run dist
 ```
 
-### `package.json` Structure
-**Crucial**: The `main` field in `package.json` MUST point to the Expo entry point (`expo-router/entry`) for the React Native/Web build to work correctly. We use `electron-builder`'s `extraMetadata` to override this for the Electron build.
+That runs `expo export --platform web --output-dir web-build` and then
+`electron-builder`. Output: **`release/win-unpacked/EmuCenter.exe`** — a
+portable folder build. `release/` is gitignored.
 
-```json
-{
-  "main": "expo-router/entry",
-  "scripts": {
-    "dist": "expo export --platform web && electron-builder"
-  },
-  "build": {
-    "extraMetadata": {
-      "main": "electron-main.js"
-    },
-    "files": [
-      "dist/**/*",
-      "backend/**/*",
-      "electron-main.js"
-    ],
-    "appId": "com.emucenter.app",
-    "mac": { "category": "public.app-category.games" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
-  }
-}
-```
+## 1. Core configuration (`package.json`)
 
-## 2. Handling Web Assets (`electron-serve`)
+The `build` block is the single source of truth. The load-bearing choices:
 
-### The Issue: Frozen App / Missing Styles
-Standard Expo web builds use absolute paths (e.g., `<script src="/_expo/...">`). When running an Electron app from the file system (`file://`), these paths resolve to the root of the drive, failing to load assets.
+| Setting | Value | Why |
+|---|---|---|
+| `main` (package root) | `expo-router/entry` | Expo's bundler must see its own entry. If `main` points at `electron-main.js`, Expo bundles the Electron main process into the web app and crashes on `__dirname` (see §3). |
+| `build.extraMetadata.main` | `electron-main.js` | electron-builder rewrites `main` **inside the package only**. No manual field-swapping before/after builds — the old runbook's Step 3/Step 5 dance is obsolete. |
+| `build.asar` | `false` | The backend runs as a **forked child process** (`backend/server.js`) and passes `.ps1` script paths to `powershell -File`. Neither works from inside an asar archive — the December build shipped a bare `app.asar` and the native file pickers were broken regardless of signing. Unarchived output reproduces the layout the proven electron-packager build used. |
+| `build.files` | `web-build/**`, `backend/**`, `!backend/config/**`, `electron-main.js` | `backend/config/` holds real IGDB/Twitch credentials and the personal game library — it must never ship. Packaged installs start clean and write config to userData (§4). |
+| `build.win.target` | `dir` | Portable folder. No installer toolchain involved. |
+| `build.win.signAndEditExecutable` | `false` | Skips the winCodeSign toolchain entirely — the fix for the symlink failure (§5). Cosmetic cost only: the exe keeps the stock Electron icon/metadata. |
+| `build.directories.output` | `release` | Gitignored. `release-packager/` and `release-v3/` are dead outputs from December. |
 
-### The Fix: Custom Protocol
-We use `electron-serve` to serve the `dist` folder via a custom `app://` protocol.
+## 2. Web assets (`electron-serve`)
 
-**`electron-main.js` Setup:**
+Expo web builds reference absolute paths (`/_expo/...`), which break under
+`file://`. `electron-main.js` serves the **`web-build`** directory through
+electron-serve's `app://` protocol:
+
 ```javascript
-const { app, BrowserWindow } = require('electron');
-const serveLib = require('electron-serve');
-// Handle default export compatibility
-const serve = serveLib.default || serveLib;
-
-// Serve the 'dist' directory via app:// protocol
-const loadURL = serve({ directory: 'dist' });
-
-async function createWindow() {
-    mainWindow = new BrowserWindow({
-         width: 1200,
-         height: 800,
-         webPreferences: {
-             nodeIntegration: false,
-             contextIsolation: true,
-         }
-    });
-
-    // Load the app
-    await loadURL(mainWindow);
-}
+const loadURL = serve({ directory: 'web-build' });
 ```
 
-## 3. Bundling Collision (`__dirname` errors)
+The export dir is `web-build` in all three places that must agree: the `dist`
+script, `electron-main.js`, and `build.files`. (An older revision of this
+guide said `dist` — that was the drift that broke reproducibility.)
 
-### The Issue: `ReferenceError: __dirname is not defined`
-If `package.json > main` is set to `electron-main.js`, Expo's web bundler attempts to bundle the Electron main process code into the web application. Since `__dirname` is a Node.js global not present in the browser, this causes a crash.
+## 3. Bundling collision (`__dirname is not defined`)
 
-### The Fix
-1.  **Revert** `package.json > main` to `expo-router/entry`.
-2.  **Override** it in `electron-builder` config using `extraMetadata` (as shown in Section 1).
+If `package.json > main` is set to `electron-main.js`, Expo bundles the
+Electron main process into the web app; `__dirname` doesn't exist in the
+browser and the app crashes. Keep `main` at `expo-router/entry` and let
+`extraMetadata` override it inside the package (§1).
 
-## 4. Backend Integration (Node.js)
+## 4. Data locations
 
-### Path Handling
-In a packaged Electron app, the filesystem is read-only (inside an ASAR archive). The backend must be aware of this.
-*   **Code/Assets**: Read from `path.join(__dirname, ...)`
-*   **User Data (Config/Saves)**: Must be written to `app.getPath('userData')`.
+`electron-main.js` forks the backend with:
 
-**`electron-main.js`**:
-Pass the `userData` path to the forked backend process:
 ```javascript
-backendProcess = fork(backendPath, [], {
-    env: {
-        ...process.env,
-        IS_ELECTRON: true,
-        USER_DATA_PATH: app.getPath('userData')
-    }
-});
+env: { IS_ELECTRON: true, USER_DATA_PATH: app.getPath('userData') }
 ```
 
-**`backend/server.js`**:
-Consume the environment variable:
-```javascript
-const CONFIG_DIR = (process.env.IS_ELECTRON && process.env.USER_DATA_PATH)
-    ? path.join(process.env.USER_DATA_PATH, 'config')
-    : path.join(__dirname, 'config');
-```
+`backend/server.js` derives both stores from it:
 
-## 5. Windows Packaging
+| | Dev (`npm start` in backend/) | Packaged |
+|---|---|---|
+| Config (library, settings, IGDB creds) | `backend/config/` | `%APPDATA%/EmuCenter/config/` |
+| Cover images (uploads + matcher) | `backend/images/` | `%APPDATA%/EmuCenter/images/` (seeded once from the bundled images) |
 
-### Prerequisites
-*   A Windows machine is recommended for building Windows artifacts (NSIS installers), though it can be done on macOS/Linux using Wine (often complex to set up).
-*   If building on macOS, you can usually build a portable generic executable, but for proper `.exe` installers, CI/CD (GitHub Actions) or a Windows VM is best.
+An empty library on the first packaged run is expected — add an emulator to
+confirm the write path works.
 
-### Configuration
-The current `package.json` is already configured for Windows:
-```json
-"win": {
-  "target": "nsis"
-}
-```
+## 5. The winCodeSign failure (December 2025) and its fix
 
-### Building for Windows (Recommended)
-Due to common permission and path length issues with `electron-builder` on Windows, we recommend using `electron-packager` for a reliable build.
+Every `electron-builder` run failed while extracting its `winCodeSign-2.6.0`
+cache: 7-Zip tried to create macOS symlinks and Windows refused
+(`Cannot create symbolic link : El cliente no dispone de un privilegio requerido`).
+Creating symlinks needs Developer Mode or an elevated shell.
 
-1.  **Prepare the Web Build**:
-    ```bash
-    npx expo export --platform web --output-dir web-build
-    ```
+**Fix used here:** don't need winCodeSign at all. `win.target: "dir"` +
+`signAndEditExecutable: false` means electron-builder never downloads or
+extracts that toolchain.
 
-2.  **Point entry to Electron**:
-    Temporarily change the `main` field in `package.json` to `electron-main.js`:
-    ```json
-    "main": "electron-main.js"
-    ```
+**If you later want a real NSIS installer:**
+1. Enable Windows **Developer Mode** (Settings → System → For developers) —
+   grants the symlink privilege; the cache then extracts fine. (One elevated
+   build also works; the cache in `%LOCALAPPDATA%\electron-builder\Cache`
+   persists for later non-elevated builds.)
+2. Switch `win.target` to `"nsis"` (optionally add an `icon`).
+3. `npm run dist` again.
 
-We found that `electron-builder` can be unstable in some Windows environments due to file locking and cache permission issues. The most reliable method for Windows is using `electron-packager`.
+## 6. Debugging a packaged build
 
-**Step 1: Install electron-packager**
-```bash
-npm install --save-dev electron-packager
-```
+Launch from a terminal to see backend stdout and Electron stderr:
 
-**Step 2: Build the Web App**
-First, export the Expo app for web:
-```bash
-npx expo export --platform web
-```
-
-**Step 3: Prepare `package.json`**
-For the packaged app to launch `electron-main.js` correctly, you must temporarily update the `main` field in `package.json`.
-*   Change `"main": "expo-router/entry"` to `"main": "electron-main.js"`
-
-**Step 4: Run Packager**
-Run the following command to package the app (replace exclusions as needed):
-```bash
-npx electron-packager . "EmuCenter" --platform=win32 --arch=x64 --out=release-build --overwrite --ignore="^\.git" --ignore="^\.vscode" --ignore="^src" --ignore="^assets" --ignore="^node_modules/(?!electron-serve|express|cors|multer)"
-```
-*   **Output**: `release-build/EmuCenter-win32-x64/EmuCenter.exe`
-
-**Step 5: Restore `package.json`**
-After packaging is complete, revert the `main` field in `package.json`:
-*   Change `"main": "electron-main.js"` back to `"main": "expo-router/entry"`
-
-### Windows Specific Considerations
-1.  **Paths**: Windows uses backslashes (`\`). Ensure all path joining in the backend uses `path.join()` which handles this automatically.
-2.  **Shell Commands**: The backend checks `os.platform()`.
-    *   Ensure `powershell` or `cmd.exe` commands are correctly formatted.
-    *   The `open-file-dialog` implementation in `server.js` includes specific PowerShell logic for Windows.
-
-## 6. Debugging
-
-To view logs (both backend `stdout` and Electron `stderr`) of a packaged application:
-
-**macOS**:
-```bash
-/Applications/test-app.app/Contents/MacOS/test-app
-```
-
-**Windows**:
-Launch the executable from Command Prompt or PowerShell:
 ```powershell
-.\dist\win-unpacked\test-app.exe
+.\release\win-unpacked\EmuCenter.exe
 ```
+
+Backend logs print the images directory and port on boot. The packaged
+backend binds port 3001 — stop any dev backend first.
+
+## Appendix: electron-packager fallback
+
+The December 2025 build that worked (`release-packager/test-app-win32-x64/`)
+used electron-packager. Only reach for this if electron-builder breaks again;
+note electron-packager is EOL (superseded by `@electron/packager`) and needs
+the manual `main`-field swap that electron-builder's `extraMetadata` avoids:
+
+1. `npx expo export --platform web --output-dir web-build`
+2. Temporarily set `"main": "electron-main.js"` in `package.json`.
+3. ```bash
+   npx electron-packager . "EmuCenter" --platform=win32 --arch=x64 \
+     --out=release-packager --overwrite --ignore="^/\.git" \
+     --ignore="^/release" --ignore="^/backend/config"
+   ```
+4. Revert `"main"` to `"expo-router/entry"`.
