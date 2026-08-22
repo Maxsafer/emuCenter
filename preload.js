@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('emuDesktop', {
     toggleFullscreen: () => ipcRenderer.invoke('fullscreen:toggle'),
     isFullscreen: () => ipcRenderer.invoke('fullscreen:get'),
     minimize: () => ipcRenderer.invoke('window:minimize'),
+    quit: () => ipcRenderer.invoke('window:quit'),
     onFullscreenChange: (callback) => {
         ipcRenderer.on('fullscreen:changed', (_event, value) => callback(value));
     },

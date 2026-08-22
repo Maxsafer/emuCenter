@@ -59,6 +59,7 @@ ipcMain.handle('fullscreen:toggle', () => {
 });
 ipcMain.handle('fullscreen:get', () => (mainWindow ? mainWindow.isFullScreen() : false));
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.handle('window:quit', () => { app.quit(); }); // will-quit kills the backend
 
 function startBackend() {
     // Spawn the existing server.js as a child process

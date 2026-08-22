@@ -611,6 +611,14 @@ export default function HomeScreen() {
               >
                 <Ionicons name="settings-outline" size={24} color="#94A3B8" />
               </Pressable>
+              {desktop && (
+                <Pressable
+                  style={styles.iconButton}
+                  onPress={() => desktop.quit()}
+                >
+                  <Ionicons name="power" size={24} color="#F87171" />
+                </Pressable>
+              )}
             </View>
           </View>
 

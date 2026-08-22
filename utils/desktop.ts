@@ -6,6 +6,7 @@ export interface DesktopBridge {
     toggleFullscreen: () => Promise<boolean>;
     isFullscreen: () => Promise<boolean>;
     minimize: () => Promise<void>;
+    quit: () => Promise<void>;
     onFullscreenChange: (callback: (fullscreen: boolean) => void) => void;
 }
 
