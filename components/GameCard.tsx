@@ -24,6 +24,10 @@ interface GameCardProps {
 export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = false, apiUrl = DEFAULT_API_URL }: GameCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [imageError, setImageError] = useState(false);
+    // Cover refresh without a page reload: an uploaded cover's direct URL
+    // overrides the matcher URL; imageVersion cache-busts after a delete.
+    const [overrideUrl, setOverrideUrl] = useState<string | null>(null);
+    const [imageVersion, setImageVersion] = useState(0);
     const scale = useSharedValue(1);
     const { width } = useWindowDimensions();
 
@@ -34,7 +38,8 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
     const dynamicLineHeight = dynamicTitleSize * 1.2;
 
     // Always try to load image dynamically from backend
-    const imageUrl = getGameImageUrl(game.name, apiUrl);
+    const imageUrl = overrideUrl
+        ?? getGameImageUrl(game.name, apiUrl) + (imageVersion ? `?v=${imageVersion}` : '');
     const showImage = !simplifiedUI && !imageError;
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -68,13 +73,10 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
 
             const data = await response.json();
             if (data.success) {
-                // Force image refresh by appending timestamp
+                // Point directly at the uploaded file, versioned to dodge the
+                // browser's cached redirect target on same-name re-uploads.
+                setOverrideUrl(`${apiUrl}${data.path}?v=${Date.now()}`);
                 setImageError(false);
-                // We might need a way to trigger a re-render of the image. 
-                // Since getGameImageUrl returns a URL, we might need to force an update.
-                // For now, let's just reload the window or rely on state update if we had the URL in state.
-                // A simple way is to reload the page or trigger a parent refresh, but for this component:
-                window.location.reload();
             } else {
                 console.error('Upload failed:', data.error);
                 alert('Upload failed: ' + data.error);
@@ -99,7 +101,11 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
 
             const data = await response.json();
             if (data.success) {
-                window.location.reload();
+                // Back to the matcher URL, re-versioned so the matching re-runs;
+                // onError flips to the placeholder gradient if nothing matches.
+                setOverrideUrl(null);
+                setImageError(false);
+                setImageVersion(Date.now());
             } else {
                 alert('Delete failed: ' + data.message);
             }
@@ -296,19 +302,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         height: '60%', // Larger gradient for bigger text visibility
     },
-    hoverOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    playIndicator: {
-        shadowColor: '#FFFFFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: 20,
-    },
     content: {
         flex: 1,
         padding: 12, // Was 8
@@ -352,10 +345,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.7)',
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    favoriteIcon: {
-        borderRadius: 8,
-        overflow: 'hidden',
     },
     favoriteButton: {
         borderRadius: 8,
