@@ -8,13 +8,14 @@ import { Platform } from 'react-native';
  */
 export type NavAction =
     | { type: 'direction'; dir: 'up' | 'down' | 'left' | 'right' }
-    | { type: 'accept' }    // A / Enter      -> launch selected game
-    | { type: 'back' }      // B / Escape     -> clear selection
-    | { type: 'favorite' }  // BACK-Select / F
-    | { type: 'sort' }      // Y / R          -> toggle sort mode
-    | { type: 'info' }      // START / I      -> expand/collapse all sections
-    | { type: 'tabLeft' }   // LB / Q
-    | { type: 'tabRight' }; // RB / E
+    | { type: 'accept' }     // A / Enter      -> launch selected game
+    | { type: 'back' }       // B / Escape     -> clear selection
+    | { type: 'favorite' }   // BACK-Select / F
+    | { type: 'sort' }       // Y / R          -> toggle sort mode
+    | { type: 'info' }       // START / I      -> expand/collapse all sections
+    | { type: 'infoCards' }  // X / T          -> show/hide title+badge overlays
+    | { type: 'tabLeft' }    // LB / Q
+    | { type: 'tabRight' };  // RB / E
 
 export interface ConnectedGamepad {
     index: number;
@@ -27,6 +28,7 @@ export type InputMode = 'pointer' | 'controller';
 // XInput pads (Ayaneo Slide included) expose mapping === 'standard' in Chromium.
 const BTN_A = 0;
 const BTN_B = 1;
+const BTN_X = 2;
 const BTN_Y = 3;
 const BTN_LB = 4;
 const BTN_RB = 5;
@@ -40,6 +42,7 @@ const BTN_DPAD_RIGHT = 15;
 const ACTION_BUTTONS: ReadonlyArray<[number, NavAction]> = [
     [BTN_A, { type: 'accept' }],
     [BTN_B, { type: 'back' }],
+    [BTN_X, { type: 'infoCards' }],
     [BTN_Y, { type: 'sort' }],
     [BTN_LB, { type: 'tabLeft' }],
     [BTN_RB, { type: 'tabRight' }],
@@ -65,6 +68,7 @@ const KEY_ACTIONS: Record<string, NavAction> = {
     f: { type: 'favorite' },
     r: { type: 'sort' },
     i: { type: 'info' },
+    t: { type: 'infoCards' },
     q: { type: 'tabLeft' },
     e: { type: 'tabRight' },
 };

@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS: Settings = {
     apiUrl: DEFAULT_API_URL,
     preferredController: -1,
     virtualPadEnabled: false,
+    fullscreenOnStart: false,
+    showInfoCards: true,
 };
 
 export function useSettings() {
@@ -82,6 +84,14 @@ export function useSettings() {
         updateSettings({ virtualPadEnabled: enabled });
     }, [updateSettings]);
 
+    const setFullscreenOnStart = useCallback((enabled: boolean) => {
+        updateSettings({ fullscreenOnStart: enabled });
+    }, [updateSettings]);
+
+    const setShowInfoCards = useCallback((show: boolean) => {
+        updateSettings({ showInfoCards: show });
+    }, [updateSettings]);
+
     const resetSettings = useCallback(() => {
         setSettings(DEFAULT_SETTINGS);
     }, []);
@@ -97,6 +107,8 @@ export function useSettings() {
         setApiUrl,
         setPreferredController,
         setVirtualPadEnabled,
+        setFullscreenOnStart,
+        setShowInfoCards,
         resetSettings,
     };
 }

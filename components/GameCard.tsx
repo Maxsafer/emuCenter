@@ -25,6 +25,8 @@ interface GameCardProps {
     apiUrl?: string;
     /** Controller-navigation selection highlight */
     selected?: boolean;
+    /** Title + emulator badge overlays (the original's "info cards") */
+    showInfo?: boolean;
     /** Lets the grid scroll the selected card into view (web DOM node) */
     registerRef?: (id: string, node: unknown) => void;
 }
@@ -36,6 +38,7 @@ export const GameCard = React.memo(function GameCard({
     simplifiedUI = false,
     apiUrl = DEFAULT_API_URL,
     selected = false,
+    showInfo = true,
     registerRef,
 }: GameCardProps) {
     const [isHovered, setIsHovered] = useState(false);
@@ -218,9 +221,11 @@ export const GameCard = React.memo(function GameCard({
                 <View style={styles.content} pointerEvents="box-none">
                     {/* Top Bar: Emulator Badge + Actions */}
                     <View style={styles.topBar} pointerEvents="box-none">
-                        <View style={styles.emulatorBadge}>
-                            <Text style={styles.emulatorText}>{game.emulator.toUpperCase()}</Text>
-                        </View>
+                        {showInfo ? (
+                            <View style={styles.emulatorBadge}>
+                                <Text style={styles.emulatorText}>{game.emulator.toUpperCase()}</Text>
+                            </View>
+                        ) : <View />}
 
                         <View style={styles.actionsContainer} pointerEvents="box-none">
                             {/* Edit/Upload Button */}
@@ -288,8 +293,9 @@ export const GameCard = React.memo(function GameCard({
                         </div>
                     )}
 
-                    {/* Bottom: Game Title */}
-                    <View style={styles.titleContainer} pointerEvents="none">
+                    {/* Bottom: Game Title. Hidden with the info toggle, except
+                        on cover-less cards, which would become unidentifiable. */}
+                    {(showInfo || !showImage) && <View style={styles.titleContainer} pointerEvents="none">
                         <Text
                             style={[
                                 styles.gameTitle,
@@ -304,7 +310,7 @@ export const GameCard = React.memo(function GameCard({
                                 {game.playCount} play{game.playCount !== 1 ? 's' : ''}
                             </Text>
                         )}
-                    </View>
+                    </View>}
                 </View>
 
                 {/* Glow Effect Border */}

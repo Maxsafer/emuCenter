@@ -22,6 +22,10 @@ interface SettingsModalProps {
     onToggleSimplifiedUI: (value: boolean) => void;
     navSoundVolume: number;
     onSetNavSoundVolume: (volume: number) => void;
+    fullscreenOnStart: boolean;
+    onToggleFullscreenOnStart: (value: boolean) => void;
+    showInfoCards: boolean;
+    onToggleShowInfoCards: (value: boolean) => void;
     sortBy: 'alphabetical' | 'emulator';
     onToggleSort: () => void;
     emulatorCount: number;
@@ -43,6 +47,10 @@ export function SettingsModal({
     onToggleSimplifiedUI,
     navSoundVolume,
     onSetNavSoundVolume,
+    fullscreenOnStart,
+    onToggleFullscreenOnStart,
+    showInfoCards,
+    onToggleShowInfoCards,
     sortBy,
     onToggleSort,
     emulatorCount,
@@ -202,6 +210,36 @@ export function SettingsModal({
                                 onValueChange={onToggleSimplifiedUI}
                                 trackColor={{ false: '#334155', true: '#3B82F6' }}
                                 thumbColor={simplifiedUI ? '#F8FAFC' : '#94A3B8'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Game info on covers</Text>
+                                <Text style={styles.settingDescription}>
+                                    Title and emulator badges over cover art (X / T to toggle)
+                                </Text>
+                            </View>
+                            <Switch
+                                value={showInfoCards}
+                                onValueChange={onToggleShowInfoCards}
+                                trackColor={{ false: '#334155', true: '#3B82F6' }}
+                                thumbColor={showInfoCards ? '#F8FAFC' : '#94A3B8'}
+                            />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Start in fullscreen</Text>
+                                <Text style={styles.settingDescription}>
+                                    The desktop app opens fullscreen on launch
+                                </Text>
+                            </View>
+                            <Switch
+                                value={fullscreenOnStart}
+                                onValueChange={onToggleFullscreenOnStart}
+                                trackColor={{ false: '#334155', true: '#3B82F6' }}
+                                thumbColor={fullscreenOnStart ? '#F8FAFC' : '#94A3B8'}
                             />
                         </View>
 

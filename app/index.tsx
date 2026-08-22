@@ -48,7 +48,16 @@ const GRID_COLUMNS = 6;
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { settings, setSortBy, setSimplifiedUI, setPreferredController, setVirtualPadEnabled, setNavSoundVolume } = useSettings();
+  const {
+    settings,
+    setSortBy,
+    setSimplifiedUI,
+    setPreferredController,
+    setVirtualPadEnabled,
+    setNavSoundVolume,
+    setFullscreenOnStart,
+    setShowInfoCards,
+  } = useSettings();
   const playNavSound = useNavSound(settings.apiUrl, settings.navSoundVolume);
   const { status: virtualPadStatus, setEnabled: setVirtualPadBackend } = useVirtualPad(settings.apiUrl);
 
@@ -254,6 +263,24 @@ export default function HomeScreen() {
     setSortBy(settings.sortBy === 'alphabetical' ? 'emulator' : 'alphabetical');
   };
 
+  // Browser/Electron fullscreen (the HTML5 API drives the Electron window too)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (typeof document === 'undefined') return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+
   const cycleTab = (direction: 'left' | 'right') => {
     const currentIndex = TAB_CONFIG.findIndex(t => t.key === currentTab);
     let newIndex;
@@ -386,6 +413,9 @@ export default function HomeScreen() {
         case 'info':
           toggleAllSections();
           break;
+        case 'infoCards':
+          setShowInfoCards(!settings.showInfoCards);
+          break;
         case 'back':
           clearSelection();
           break;
@@ -452,6 +482,7 @@ export default function HomeScreen() {
               simplifiedUI={settings.simplifiedUI}
               apiUrl={settings.apiUrl}
               selected={inputMode === 'controller' && game.id === selectedId}
+              showInfo={settings.showInfoCards}
               registerRef={registerCardRef}
             />
           ))}
@@ -520,6 +551,16 @@ export default function HomeScreen() {
             <View style={styles.headerRight}>
               <Pressable
                 style={styles.iconButton}
+                onPress={toggleFullscreen}
+              >
+                <Ionicons
+                  name={isFullscreen ? 'contract' : 'expand'}
+                  size={24}
+                  color="#94A3B8"
+                />
+              </Pressable>
+              <Pressable
+                style={styles.iconButton}
                 onPress={toggleAllSections}
               >
                 <Ionicons
@@ -584,6 +625,10 @@ export default function HomeScreen() {
         onToggleSimplifiedUI={setSimplifiedUI}
         navSoundVolume={settings.navSoundVolume}
         onSetNavSoundVolume={setNavSoundVolume}
+        fullscreenOnStart={settings.fullscreenOnStart}
+        onToggleFullscreenOnStart={setFullscreenOnStart}
+        showInfoCards={settings.showInfoCards}
+        onToggleShowInfoCards={setShowInfoCards}
         sortBy={settings.sortBy}
         onToggleSort={toggleSort}
         emulatorCount={emulators.length}

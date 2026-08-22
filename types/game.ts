@@ -38,6 +38,10 @@ export interface Settings {
     // Virtual controller aggregator (ViGEm): any physical pad drives one
     // stable virtual pad. When on, its slot overrides preferredController.
     virtualPadEnabled: boolean;
+    // Start the desktop app fullscreen (read by the Electron shell on boot)
+    fullscreenOnStart: boolean;
+    // Title + emulator badge overlays on covers (the original's "info cards")
+    showInfoCards: boolean;
 }
 
 export interface RecentGame {
