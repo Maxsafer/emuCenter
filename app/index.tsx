@@ -1,4 +1,5 @@
 import { AddEmulatorModal } from '@/components/AddEmulatorModal';
+import { ConfirmExitModal } from '@/components/ConfirmExitModal';
 import { GameCard } from '@/components/GameCard';
 import { ManageEmulatorsModal } from '@/components/ManageEmulatorsModal';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -90,6 +91,7 @@ export default function HomeScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [addEmulatorVisible, setAddEmulatorVisible] = useState(false);
   const [manageEmulatorsVisible, setManageEmulatorsVisible] = useState(false);
+  const [confirmExitVisible, setConfirmExitVisible] = useState(false);
 
   const [editingEmulator, setEditingEmulator] = useState<any | null>(null);
 
@@ -417,6 +419,12 @@ export default function HomeScreen() {
     // every action fires twice
     excludeIndex: virtualPadStatus?.enabled ? virtualPadStatus.slot : undefined,
     onAction: (action) => {
+      // The exit dialog captures input while open: A confirms, B cancels
+      if (confirmExitVisible) {
+        if (action.type === 'accept') desktop?.quit();
+        if (action.type === 'back') setConfirmExitVisible(false);
+        return;
+      }
       switch (action.type) {
         case 'direction':
           moveSelection(action.dir);
@@ -443,7 +451,13 @@ export default function HomeScreen() {
           setShowInfoCards(!settings.showInfoCards);
           break;
         case 'back':
-          clearSelection();
+          // Back semantics like the original's B-to-quit, but progressive
+          // and guarded: deselect first, then ask before exiting.
+          if (selectedId) {
+            clearSelection();
+          } else if (desktop) {
+            setConfirmExitVisible(true);
+          }
           break;
       }
     },
@@ -614,7 +628,7 @@ export default function HomeScreen() {
               {desktop && (
                 <Pressable
                   style={styles.iconButton}
-                  onPress={() => desktop.quit()}
+                  onPress={() => setConfirmExitVisible(true)}
                 >
                   <Ionicons name="power" size={24} color="#F87171" />
                 </Pressable>
@@ -677,6 +691,12 @@ export default function HomeScreen() {
         onSetPreferredController={setPreferredController}
         virtualPadStatus={virtualPadStatus}
         onToggleVirtualPad={handleToggleVirtualPad}
+      />
+
+      <ConfirmExitModal
+        visible={confirmExitVisible}
+        onCancel={() => setConfirmExitVisible(false)}
+        onConfirm={() => desktop?.quit()}
       />
 
       <ManageEmulatorsModal
