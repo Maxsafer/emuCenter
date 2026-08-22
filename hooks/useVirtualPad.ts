@@ -28,8 +28,14 @@ export function useVirtualPad(apiUrl: string) {
         }
     }, [apiUrl]);
 
+    // Poll instead of fetch-once: at boot the backend may still be starting
+    // (or restoring the aggregator), and a stale "disabled" status here means
+    // the virtual pad's input echo is not excluded - every button would
+    // double-fire in the UI.
     useEffect(() => {
         refresh();
+        const id = setInterval(refresh, 3000);
+        return () => clearInterval(id);
     }, [refresh]);
 
     const setEnabled = useCallback(async (enabled: boolean): Promise<VirtualPadStatus | null> => {

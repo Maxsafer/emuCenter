@@ -92,6 +92,8 @@ export default function HomeScreen() {
   const [addEmulatorVisible, setAddEmulatorVisible] = useState(false);
   const [manageEmulatorsVisible, setManageEmulatorsVisible] = useState(false);
   const [confirmExitVisible, setConfirmExitVisible] = useState(false);
+  const lastBackActionAt = React.useRef(0);
+  const confirmOpenedAt = React.useRef(0);
 
   const [editingEmulator, setEditingEmulator] = useState<any | null>(null);
 
@@ -419,9 +421,24 @@ export default function HomeScreen() {
     // every action fires twice
     excludeIndex: virtualPadStatus?.enabled ? virtualPadStatus.slot : undefined,
     onAction: (action) => {
+      // Debounce 'back': until the virtual-pad status poll catches up after
+      // boot, the aggregator pad echoes the physical one a frame later -
+      // without this, one B press deselects AND opens the exit dialog, or
+      // closes AND reopens it. 150ms is above the echo, below a human
+      // double-press.
+      if (action.type === 'back') {
+        const now = Date.now();
+        if (now - lastBackActionAt.current < 150) return;
+        lastBackActionAt.current = now;
+      }
+
       // The exit dialog captures input while open: A confirms, B cancels
       if (confirmExitVisible) {
-        if (action.type === 'accept') desktop?.quit();
+        // Grace period so an echoed A from just before the dialog opened
+        // cannot instantly confirm quitting
+        if (action.type === 'accept' && Date.now() - confirmOpenedAt.current > 150) {
+          desktop?.quit();
+        }
         if (action.type === 'back') setConfirmExitVisible(false);
         return;
       }
@@ -456,6 +473,7 @@ export default function HomeScreen() {
           if (selectedId) {
             clearSelection();
           } else if (desktop) {
+            confirmOpenedAt.current = Date.now();
             setConfirmExitVisible(true);
           }
           break;
@@ -628,7 +646,10 @@ export default function HomeScreen() {
               {desktop && (
                 <Pressable
                   style={styles.iconButton}
-                  onPress={() => setConfirmExitVisible(true)}
+                  onPress={() => {
+                    confirmOpenedAt.current = Date.now();
+                    setConfirmExitVisible(true);
+                  }}
                 >
                   <Ionicons name="power" size={24} color="#F87171" />
                 </Pressable>
