@@ -64,7 +64,6 @@ export function useEmulators() {
                         displayName,
                         exePath,
                         gamesPaths,
-                        gamesPath: gamesPaths[0], // Maintain legacy compat
                         template,
                         excludedExtensions,
                         icon: icon || existing.icon,
@@ -81,7 +80,6 @@ export function useEmulators() {
                         displayName,
                         exePath,
                         gamesPaths,
-                        gamesPath: gamesPaths[0], // Maintain legacy compat
                         template,
                         excludedExtensions,
                         icon,
