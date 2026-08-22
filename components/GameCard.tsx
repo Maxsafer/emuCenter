@@ -5,12 +5,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
+    cancelAnimation,
+    Easing,
     FadeIn,
     FadeOut,
     Layout,
     useAnimatedStyle,
     useSharedValue,
-    withSpring
+    withRepeat,
+    withSpring,
+    withTiming
 } from 'react-native-reanimated';
 
 interface GameCardProps {
@@ -41,7 +45,26 @@ export const GameCard = React.memo(function GameCard({
     const [overrideUrl, setOverrideUrl] = useState<string | null>(null);
     const [imageVersion, setImageVersion] = useState(0);
     const scale = useSharedValue(1);
+    // Controller-selection effects: the card pops out slightly and its cyan
+    // border "breathes" (opacity pulse) while selected.
+    const selectScale = useSharedValue(1);
+    const breathe = useSharedValue(1);
     const { width } = useWindowDimensions();
+
+    React.useEffect(() => {
+        selectScale.value = withSpring(selected ? 1.06 : 1, { damping: 14, stiffness: 160 });
+        if (selected) {
+            breathe.value = 1;
+            breathe.value = withRepeat(
+                withTiming(0.45, { duration: 850, easing: Easing.inOut(Easing.ease) }),
+                -1,
+                true
+            );
+        } else {
+            cancelAnimation(breathe);
+            breathe.value = 1;
+        }
+    }, [selected, selectScale, breathe]);
 
     // Dynamic font sizing
     // Base size 10, scales up with screen width (approx 12px at 1200px width, 16px at 1600px)
@@ -55,7 +78,11 @@ export const GameCard = React.memo(function GameCard({
     const showImage = !simplifiedUI && !imageError;
 
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
+        transform: [{ scale: scale.value * selectScale.value }],
+    }));
+
+    const breatheStyle = useAnimatedStyle(() => ({
+        opacity: breathe.value,
     }));
 
     const handlePressIn = () => {
@@ -146,7 +173,7 @@ export const GameCard = React.memo(function GameCard({
             entering={FadeIn.duration(400)}
             exiting={FadeOut}
             layout={Layout.springify()}
-            style={[styles.container, animatedStyle]}
+            style={[styles.container, selected && styles.containerSelected, animatedStyle]}
             // @ts-ignore - React Native Web supports mouse events
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -284,9 +311,16 @@ export const GameCard = React.memo(function GameCard({
                 <View style={[
                     styles.glowBorder,
                     game.isFavorite && styles.glowBorderFavorite,
-                    isHovered && styles.glowBorderHover,
-                    selected && styles.glowBorderSelected
+                    isHovered && styles.glowBorderHover
                 ]} pointerEvents="none" />
+
+                {/* Breathing selection border (controller navigation) */}
+                {selected && (
+                    <Animated.View
+                        style={[styles.glowBorder, styles.glowBorderSelected, breatheStyle]}
+                        pointerEvents="none"
+                    />
+                )}
             </View>
         </Animated.View>
     );
@@ -296,6 +330,10 @@ const styles = StyleSheet.create({
     container: {
         width: '16.666%', // Keep 6 columns, just content scales
         padding: 6, // Was 4
+    },
+    // The scaled-up selected card renders above its neighbors
+    containerSelected: {
+        zIndex: 30,
     },
     card: {
         aspectRatio: 3 / 4,
