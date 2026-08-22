@@ -66,7 +66,8 @@
       "preload.js",
       "!node_modules/**",
       "node_modules/electron-serve/**",
-      "backend/node_modules/**"
+      "backend/node_modules/**",
+      "web-build/assets/node_modules/**"
     ],
     "mac": {
       "category": "public.app-category.games"
