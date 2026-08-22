@@ -33,6 +33,8 @@ export interface Settings {
     simplifiedUI: boolean; // Disable cover images for performance
     theme: 'dark' | 'light';
     apiUrl: string; // Backend server URL
+    // Gamepad index substituted for 'vcontroller' in launch templates; -1 = none
+    preferredController: number;
 }
 
 export interface RecentGame {

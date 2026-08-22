@@ -1,3 +1,4 @@
+import { ConnectedGamepad } from '@/hooks/useInputSystem';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -24,6 +25,9 @@ interface SettingsModalProps {
     onManageEmulators: () => void;
     onSyncAll: () => Promise<{ totalAdded: number; totalUpdated: number }>;
     apiUrl: string;
+    gamepads: ConnectedGamepad[];
+    preferredController: number;
+    onSetPreferredController: (index: number) => void;
 }
 
 export function SettingsModal({
@@ -38,6 +42,9 @@ export function SettingsModal({
     onManageEmulators,
     onSyncAll,
     apiUrl,
+    gamepads,
+    preferredController,
+    onSetPreferredController,
 }: SettingsModalProps) {
     const [syncing, setSyncing] = React.useState(false);
     const [igdbClientId, setIgdbClientId] = React.useState('');
@@ -186,6 +193,50 @@ export function SettingsModal({
                                 thumbColor={simplifiedUI ? '#F8FAFC' : '#94A3B8'}
                             />
                         </View>
+                    </View>
+
+                    {/* Controller */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Controller</Text>
+                        <Text style={[styles.settingDescription, { marginBottom: 12 }]}>
+                            Substituted for &lsquo;vcontroller&rsquo; in launch templates. The
+                            index usually matches the XInput slot; with one pad both are 0.
+                        </Text>
+
+                        <Pressable
+                            style={[styles.controllerRow, preferredController === -1 && styles.controllerRowActive]}
+                            onPress={() => onSetPreferredController(-1)}
+                        >
+                            <Ionicons
+                                name={preferredController === -1 ? 'radio-button-on' : 'radio-button-off'}
+                                size={18}
+                                color={preferredController === -1 ? '#3B82F6' : '#64748B'}
+                            />
+                            <Text style={styles.controllerLabel}>None</Text>
+                        </Pressable>
+
+                        {gamepads.map(pad => (
+                            <Pressable
+                                key={pad.index}
+                                style={[styles.controllerRow, preferredController === pad.index && styles.controllerRowActive]}
+                                onPress={() => onSetPreferredController(pad.index)}
+                            >
+                                <Ionicons
+                                    name={preferredController === pad.index ? 'radio-button-on' : 'radio-button-off'}
+                                    size={18}
+                                    color={preferredController === pad.index ? '#3B82F6' : '#64748B'}
+                                />
+                                <Text style={styles.controllerLabel} numberOfLines={1}>
+                                    [{pad.index}] {pad.id}
+                                </Text>
+                            </Pressable>
+                        ))}
+
+                        {gamepads.length === 0 && (
+                            <Text style={styles.settingDescription}>
+                                No controllers detected — press a button on the pad to wake it up.
+                            </Text>
+                        )}
                     </View>
 
                     {/* IGDB Configuration */}
@@ -474,5 +525,25 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textAlign: 'center',
         marginTop: 10,
+    },
+    controllerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        marginBottom: 8,
+    },
+    controllerRowActive: {
+        borderColor: 'rgba(59, 130, 246, 0.5)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    },
+    controllerLabel: {
+        flex: 1,
+        fontSize: 14,
+        color: '#F8FAFC',
     },
 });

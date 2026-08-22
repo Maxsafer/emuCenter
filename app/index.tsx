@@ -46,7 +46,7 @@ const GRID_COLUMNS = 6;
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { settings, setSortBy, setSimplifiedUI } = useSettings();
+  const { settings, setSortBy, setSimplifiedUI, setPreferredController } = useSettings();
   const { emulators, addEmulator, removeEmulator } = useEmulators();
   const {
     games,
@@ -348,7 +348,7 @@ export default function HomeScreen() {
 
   const inputEnabled = !settingsVisible && !addEmulatorVisible && !manageEmulatorsVisible;
 
-  const { inputMode } = useInputSystem({
+  const { inputMode, gamepads } = useInputSystem({
     enabled: inputEnabled,
     onAction: (action) => {
       switch (action.type) {
@@ -569,6 +569,9 @@ export default function HomeScreen() {
           setManageEmulatorsVisible(true);
         }}
         onSyncAll={syncAllEmulators}
+        gamepads={gamepads}
+        preferredController={settings.preferredController}
+        onSetPreferredController={setPreferredController}
       />
 
       <ManageEmulatorsModal

@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: Settings = {
     simplifiedUI: false,
     theme: 'dark',
     apiUrl: DEFAULT_API_URL,
+    preferredController: -1,
 };
 
 export function useSettings() {
@@ -72,6 +73,10 @@ export function useSettings() {
         updateSettings({ apiUrl: url });
     }, [updateSettings]);
 
+    const setPreferredController = useCallback((index: number) => {
+        updateSettings({ preferredController: index });
+    }, [updateSettings]);
+
     const resetSettings = useCallback(() => {
         setSettings(DEFAULT_SETTINGS);
     }, []);
@@ -85,6 +90,7 @@ export function useSettings() {
         setSimplifiedUI,
         setTheme,
         setApiUrl,
+        setPreferredController,
         resetSettings,
     };
 }
