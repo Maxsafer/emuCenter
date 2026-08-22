@@ -56,5 +56,9 @@ release-v3/
 release/
 build_output.txt
 
+# Cross-machine build coordination (NAS-synced, not for the public repo)
+installers/
+handoff/
+
 # macOS AppleDouble files
 ._*
