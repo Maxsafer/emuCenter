@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 interface SectionHeaderProps {
     title: string;
     count?: number;
     icon?: keyof typeof Ionicons.glyphMap;
+    /** When provided, the header is pressable and shows a collapse chevron */
+    onToggle?: () => void;
+    collapsed?: boolean;
 }
 
-export function SectionHeader({ title, count, icon }: SectionHeaderProps) {
+export function SectionHeader({ title, count, icon, onToggle, collapsed = false }: SectionHeaderProps) {
     const { width } = useWindowDimensions();
     const scale = Math.min(1.5, Math.max(1, width / 1200)); // Base scale on 1200px width
 
@@ -17,7 +20,7 @@ export function SectionHeader({ title, count, icon }: SectionHeaderProps) {
     const countSize = 11 * scale;
 
     return (
-        <View style={styles.container}>
+        <Pressable style={styles.container} onPress={onToggle} disabled={!onToggle}>
             <View style={styles.content}>
                 {icon && <Ionicons name={icon} size={iconSize} color="#60A5FA" style={styles.icon} />}
                 <Text style={[styles.title, { fontSize: titleSize }]}>{title}</Text>
@@ -26,9 +29,17 @@ export function SectionHeader({ title, count, icon }: SectionHeaderProps) {
                         <Text style={[styles.count, { fontSize: countSize }]}>{count}</Text>
                     </View>
                 )}
+                {onToggle && (
+                    <Ionicons
+                        name={collapsed ? 'chevron-forward' : 'chevron-down'}
+                        size={iconSize * 0.8}
+                        color="#64748B"
+                        style={styles.chevron}
+                    />
+                )}
             </View>
             <View style={styles.line} />
-        </View>
+        </Pressable>
     );
 }
 
@@ -50,6 +61,10 @@ const styles = StyleSheet.create({
     icon: {
         opacity: 0.9,
         // Size is controlled by props, make sure to update call site or default if needed
+    },
+    chevron: {
+        marginLeft: 4,
+        opacity: 0.9,
     },
     title: {
         fontSize: 22, // Was 16

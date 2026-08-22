@@ -42,8 +42,6 @@ const TAB_CONFIG = [
 ];
 
 const GRID_COLUMNS = 6;
-// Placeholder until sections become collapsible
-const NO_COLLAPSED_SECTIONS: ReadonlySet<string> = new Set();
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -298,6 +296,43 @@ export default function HomeScreen() {
     return groups;
   }, [filteredGames, settings.sortBy]);
 
+  // --- Collapsible sections ---
+  // Keys are "sortBy:title" so alphabetical and by-emulator groupings
+  // keep independent collapse states. Session-only for now.
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set());
+
+  const sectionKey = React.useCallback(
+    (title: string) => `${settings.sortBy}:${title}`,
+    [settings.sortBy]
+  );
+
+  const collapsedTitles = useMemo(() => {
+    const titles = new Set<string>();
+    for (const section of sections) {
+      if (collapsedKeys.has(sectionKey(section.title))) titles.add(section.title);
+    }
+    return titles;
+  }, [sections, collapsedKeys, sectionKey]);
+
+  const toggleSection = React.useCallback((title: string) => {
+    setCollapsedKeys(prev => {
+      const next = new Set(prev);
+      const key = sectionKey(title);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, [sectionKey]);
+
+  const toggleAllSections = React.useCallback(() => {
+    setCollapsedKeys(prev => {
+      // Any collapsed section -> expand everything; otherwise collapse all
+      const anyCollapsed = sections.some(s => prev.has(sectionKey(s.title)));
+      if (anyCollapsed) return new Set<string>();
+      return new Set(sections.map(s => sectionKey(s.title)));
+    });
+  }, [sections, sectionKey]);
+
   // --- Controller / keyboard navigation ---
   const {
     selectedId,
@@ -307,7 +342,7 @@ export default function HomeScreen() {
     clear: clearSelection,
   } = useGridSelection({
     sections,
-    collapsedTitles: NO_COLLAPSED_SECTIONS,
+    collapsedTitles,
     columns: GRID_COLUMNS,
   });
 
@@ -336,7 +371,7 @@ export default function HomeScreen() {
           cycleTab('right');
           break;
         case 'info':
-          // Wired to expand/collapse-all once sections are collapsible
+          toggleAllSections();
           break;
         case 'back':
           clearSelection();
@@ -374,11 +409,18 @@ export default function HomeScreen() {
   const renderSection = ({ item }: { item: { title: string; data: typeof filteredGames } }) => {
     // Determine icon based on sort mode
     const icon = settings.sortBy === 'emulator' ? 'game-controller' : undefined;
+    const isCollapsed = collapsedTitles.has(item.title);
 
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader title={item.title} count={item.data.length} icon={icon} />
-        <View style={styles.gamesGrid}>
+        <SectionHeader
+          title={item.title}
+          count={item.data.length}
+          icon={icon}
+          collapsed={isCollapsed}
+          onToggle={() => toggleSection(item.title)}
+        />
+        {isCollapsed ? null : <View style={styles.gamesGrid}>
           {item.data.map((game) => (
             <GameCard
               key={game.id}
@@ -391,7 +433,7 @@ export default function HomeScreen() {
               registerRef={registerCardRef}
             />
           ))}
-        </View>
+        </View>}
       </View>
     );
   };
@@ -454,6 +496,16 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.headerRight}>
+              <Pressable
+                style={styles.iconButton}
+                onPress={toggleAllSections}
+              >
+                <Ionicons
+                  name={collapsedTitles.size > 0 ? 'chevron-expand' : 'chevron-collapse'}
+                  size={24}
+                  color="#94A3B8"
+                />
+              </Pressable>
               <Pressable
                 style={styles.iconButton}
                 onPress={toggleSort}
