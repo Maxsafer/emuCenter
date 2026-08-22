@@ -308,7 +308,7 @@ function parseCommand(command) {
 
             scripts.push({
                 type: scriptType.trim(),
-                name: scriptName.trim(),
+                name: scriptName?.trim() || '',
                 value: value?.trim() || ''
             });
         }
@@ -394,6 +394,20 @@ app.post('/launch', async (req, res) => {
                 await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
                 console.error(`Pre - launch script failed: ${error.message} `);
+                // Continue anyway - don't fail the launch
+            }
+        }
+
+        // Original-EmuCenter-format runner scripts ("?python:./scripts/x.py=args")
+        // execute before launch as "<runner> <script> <args>", matching the
+        // original's command_cleaner behavior where all hooks ran pre-launch.
+        for (const script of scripts.filter(s => s.type !== 'pre' && s.type !== 'post')) {
+            console.log(`Executing runner script: ${script.type} ${script.name} `);
+            try {
+                await executeCommand(`${script.type} ${script.name} ${script.value} `);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+                console.error(`Runner script failed: ${error.message} `);
                 // Continue anyway - don't fail the launch
             }
         }
