@@ -1,4 +1,5 @@
 import { ConnectedGamepad } from '@/hooks/useInputSystem';
+import { VirtualPadStatus } from '@/hooks/useVirtualPad';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
@@ -28,6 +29,8 @@ interface SettingsModalProps {
     gamepads: ConnectedGamepad[];
     preferredController: number;
     onSetPreferredController: (index: number) => void;
+    virtualPadStatus: VirtualPadStatus | null;
+    onToggleVirtualPad: (enabled: boolean) => void;
 }
 
 export function SettingsModal({
@@ -45,7 +48,10 @@ export function SettingsModal({
     gamepads,
     preferredController,
     onSetPreferredController,
+    virtualPadStatus,
+    onToggleVirtualPad,
 }: SettingsModalProps) {
+    const virtualPadOn = virtualPadStatus?.enabled ?? false;
     const [syncing, setSyncing] = React.useState(false);
     const [igdbClientId, setIgdbClientId] = React.useState('');
     const [igdbClientSecret, setIgdbClientSecret] = React.useState('');
@@ -198,7 +204,34 @@ export function SettingsModal({
                     {/* Controller */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Controller</Text>
-                        <Text style={[styles.settingDescription, { marginBottom: 12 }]}>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Virtual controller</Text>
+                                <Text style={styles.settingDescription}>
+                                    Any pad you pick up drives one stable virtual controller,
+                                    so emulators never need remapping (requires ViGEmBus)
+                                </Text>
+                            </View>
+                            <Switch
+                                value={virtualPadOn}
+                                onValueChange={onToggleVirtualPad}
+                                trackColor={{ false: '#334155', true: '#3B82F6' }}
+                                thumbColor={virtualPadOn ? '#F8FAFC' : '#94A3B8'}
+                            />
+                        </View>
+
+                        {virtualPadOn && (
+                            <Text style={styles.virtualPadActive}>
+                                Virtual pad active on XInput slot {virtualPadStatus?.slot} — launches
+                                use it automatically; the manual selection below is ignored.
+                            </Text>
+                        )}
+                        {virtualPadStatus?.error && (
+                            <Text style={styles.statusError}>{virtualPadStatus.error}</Text>
+                        )}
+
+                        <Text style={[styles.settingDescription, { marginBottom: 12, marginTop: 12 }]}>
                             Substituted for &lsquo;vcontroller&rsquo; in launch templates. The
                             index usually matches the XInput slot; with one pad both are 0.
                         </Text>
@@ -545,5 +578,12 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 14,
         color: '#F8FAFC',
+    },
+    virtualPadActive: {
+        color: '#10B981',
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 10,
+        lineHeight: 18,
     },
 });

@@ -35,6 +35,9 @@ export interface Settings {
     apiUrl: string; // Backend server URL
     // Gamepad index substituted for 'vcontroller' in launch templates; -1 = none
     preferredController: number;
+    // Virtual controller aggregator (ViGEm): any physical pad drives one
+    // stable virtual pad. When on, its slot overrides preferredController.
+    virtualPadEnabled: boolean;
 }
 
 export interface RecentGame {

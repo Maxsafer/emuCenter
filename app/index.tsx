@@ -9,6 +9,7 @@ import { useGames } from '@/hooks/useGames';
 import { useGridSelection } from '@/hooks/useGridSelection';
 import { useInputSystem } from '@/hooks/useInputSystem';
 import { useSettings } from '@/hooks/useSettings';
+import { useVirtualPad } from '@/hooks/useVirtualPad';
 import { Game, GameFilterMode } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,7 +47,14 @@ const GRID_COLUMNS = 6;
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { settings, setSortBy, setSimplifiedUI, setPreferredController } = useSettings();
+  const { settings, setSortBy, setSimplifiedUI, setPreferredController, setVirtualPadEnabled } = useSettings();
+  const { status: virtualPadStatus, setEnabled: setVirtualPadBackend } = useVirtualPad(settings.apiUrl);
+
+  const handleToggleVirtualPad = async (value: boolean) => {
+    const status = await setVirtualPadBackend(value);
+    // Persist only what actually happened - enabling can fail (no driver)
+    setVirtualPadEnabled(value && !!status?.enabled);
+  };
   const { emulators, addEmulator, removeEmulator } = useEmulators();
   const {
     games,
@@ -350,6 +358,9 @@ export default function HomeScreen() {
 
   const { inputMode, gamepads } = useInputSystem({
     enabled: inputEnabled,
+    // The virtual pad mirrors the physical one - ignore it in the UI or
+    // every action fires twice
+    excludeIndex: virtualPadStatus?.enabled ? virtualPadStatus.slot : undefined,
     onAction: (action) => {
       switch (action.type) {
         case 'direction':
@@ -572,6 +583,8 @@ export default function HomeScreen() {
         gamepads={gamepads}
         preferredController={settings.preferredController}
         onSetPreferredController={setPreferredController}
+        virtualPadStatus={virtualPadStatus}
+        onToggleVirtualPad={handleToggleVirtualPad}
       />
 
       <ManageEmulatorsModal

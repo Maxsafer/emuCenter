@@ -81,10 +81,16 @@ interface DirectionRepeatState {
  *
  * The pads list keeps updating while `enabled` is false (the Settings
  * picker needs it with its modal open); only action emission is gated.
+ *
+ * excludeIndex ignores one gamepad index entirely (actions AND the pads
+ * list) - used for the virtual aggregator pad, which mirrors the physical
+ * pad and would otherwise double-fire every action. Assumes Chromium's
+ * gamepad.index matches the XInput slot, which holds for XInput devices.
  */
 export function useInputSystem(opts: {
     enabled: boolean;
     onAction: (action: NavAction) => void;
+    excludeIndex?: number;
 }): { gamepads: ConnectedGamepad[]; inputMode: InputMode } {
     const [gamepads, setGamepads] = useState<ConnectedGamepad[]>([]);
     const [inputMode, setInputMode] = useState<InputMode>('pointer');
@@ -94,6 +100,8 @@ export function useInputSystem(opts: {
     onActionRef.current = opts.onAction;
     const enabledRef = useRef(opts.enabled);
     enabledRef.current = opts.enabled;
+    const excludeIndexRef = useRef(opts.excludeIndex);
+    excludeIndexRef.current = opts.excludeIndex;
 
     const inputModeRef = useRef<InputMode>('pointer');
     const setMode = (mode: InputMode) => {
@@ -131,6 +139,7 @@ export function useInputSystem(opts: {
 
             for (const pad of pads) {
                 if (!pad || !pad.connected) continue;
+                if (pad.index === excludeIndexRef.current) continue;
                 connected.push({ index: pad.index, id: pad.id });
 
                 const prev = prevPressed.get(pad.index) ?? [];

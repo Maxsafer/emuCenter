@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Settings = {
     theme: 'dark',
     apiUrl: DEFAULT_API_URL,
     preferredController: -1,
+    virtualPadEnabled: false,
 };
 
 export function useSettings() {
@@ -77,6 +78,10 @@ export function useSettings() {
         updateSettings({ preferredController: index });
     }, [updateSettings]);
 
+    const setVirtualPadEnabled = useCallback((enabled: boolean) => {
+        updateSettings({ virtualPadEnabled: enabled });
+    }, [updateSettings]);
+
     const resetSettings = useCallback(() => {
         setSettings(DEFAULT_SETTINGS);
     }, []);
@@ -91,6 +96,7 @@ export function useSettings() {
         setTheme,
         setApiUrl,
         setPreferredController,
+        setVirtualPadEnabled,
         resetSettings,
     };
 }
