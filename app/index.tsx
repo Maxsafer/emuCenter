@@ -56,7 +56,6 @@ export default function HomeScreen() {
   } = useGames(settings.apiUrl);
 
   // Cleanup orphaned games whenever emulators change
-  // Cleanup orphaned games whenever emulators change
   React.useEffect(() => {
     // We must run cleanup even if emulators list is empty (to remove all games)
     if (emulators === undefined) return;
@@ -71,7 +70,6 @@ export default function HomeScreen() {
   const [editingEmulator, setEditingEmulator] = useState<any | null>(null);
 
   const HEADER_HEIGHT = 60 + insets.top; // Approximate height including padding
-  const scrollY = useSharedValue(0);
   const headerTranslateY = useSharedValue(0);
   const lastScrollY = useSharedValue(0);
 
@@ -97,7 +95,6 @@ export default function HomeScreen() {
       }
 
       lastScrollY.value = currentY;
-      scrollY.value = currentY;
     },
   });
 
@@ -156,52 +153,6 @@ export default function HomeScreen() {
         return games;
     }
   }, [currentTab, games, getFavoriteGames, getRecentGames]);
-
-  // Sort and group games
-  const groupedGames = useMemo(() => {
-    const sorted: Record<string, Game[]> = {};
-
-    if (settings.sortBy === 'alphabetical') {
-      // Group by first letter
-      filteredGames.forEach(game => {
-        const letter = game.cleanName[0]?.toUpperCase() || '#';
-        if (!sorted[letter]) sorted[letter] = [];
-        sorted[letter].push(game);
-      });
-    } else {
-      // Group by emulator
-      filteredGames.forEach(game => {
-        const emu = game.emulator || 'Unknown';
-        if (!sorted[emu]) sorted[emu] = [];
-        sorted[emu].push(game);
-      });
-    }
-
-    // Sort keys
-    const sortedKeys = Object.keys(sorted).sort();
-    const result: Record<string, Game[]> = {};
-    sortedKeys.forEach(key => {
-      result[key] = sorted[key].sort((a, b) =>
-        a.cleanName.localeCompare(b.cleanName)
-      );
-    });
-
-    return result;
-  }, [filteredGames, settings.sortBy]);
-
-  // Flatten for FlatList
-  const flatData = useMemo(() => {
-    const items: Array<{ type: 'header' | 'game'; key: string; data: any }> = [];
-
-    Object.entries(groupedGames).forEach(([header, gamesList]) => {
-      items.push({ type: 'header', key: `header - ${header} `, data: header });
-      gamesList.forEach(game => {
-        items.push({ type: 'game', key: game.id, data: game });
-      });
-    });
-
-    return items;
-  }, [groupedGames]);
 
   const handleLaunch = async (game: Game) => {
     if (isDragging.current) return;
