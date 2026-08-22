@@ -66,6 +66,18 @@ export function useGames(apiUrl: string) {
         saveRecents();
     }, [recents, loading]);
 
+    // Invariant: recents may only reference games that still exist. This heals
+    // every removal path (emulator removal, orphan cleanup, scan removals).
+    useEffect(() => {
+        if (loading) return;
+
+        setRecents(prev => {
+            const ids = new Set(games.map(g => g.id));
+            const filtered = prev.filter(r => ids.has(r.gameId));
+            return filtered.length === prev.length ? prev : filtered;
+        });
+    }, [games, loading]);
+
     const addGame = useCallback(async (
         name: string,
         emulator: string,
@@ -200,59 +212,8 @@ export function useGames(apiUrl: string) {
 
         console.log(`[useGames] Discovered ${discoveredGames.length} games on disk`);
 
-        setGames(prevGames => {
-            const existingGamesForEmulator = prevGames.filter(g => g.emulator === emulator.name);
-            const discoveredNames = new Set(discoveredGames.map(g => g.name));
-
-            // 1. Identify games to remove (orphans within this emulator)
-            const gamesToRemove = existingGamesForEmulator.filter(g => !discoveredNames.has(g.name));
-            let newGamesList = prevGames.filter(game =>
-                !(game.emulator === emulator.name && !discoveredNames.has(game.name))
-            );
-
-            // 2. Add or Update games
-            const addedGames: Game[] = [];
-            let addedCount = 0;
-            let updatedCount = 0;
-
-            for (const discoveredGame of discoveredGames) {
-                const command = buildGameCommand(emulator, discoveredGame.path);
-                const existingGame = prevGames.find(g =>
-                    g.name === discoveredGame.name && g.emulator === emulator.name
-                );
-
-                if (existingGame) {
-                    if (existingGame.command !== command) {
-                        // Update existing game in the new list
-                        newGamesList = newGamesList.map(g =>
-                            g.id === existingGame.id ? { ...g, command } : g
-                        );
-                        updatedCount++;
-                    }
-                } else {
-                    // Create new game
-                    const cleanedName = cleanGameName(discoveredGame.name);
-                    // Note: We can't await findBackgroundImage here synchronously inside setState
-                    // So we'll add it with undefined coverImage first, and maybe trigger an update later
-                    // Or we could run calculate new games BEFORE setGames.
-                    // Let's refactor to calculate BEFORE setGames.
-                    // But we need 'prevGames' to know what expects.
-                    // Actually, we can just use 'games' from closure if we assume 'games' is reasonably fresh?
-                    // NO, 'games' is stale in the loop.
-                    // The safer way is to trust 'prevGames'.
-                }
-            }
-            return prevGames; // Placeholder for now - see below
-        });
-
-        // Correct approach: Calculate additions/updates based on PREVIOUS state to avoid races.
-        // However, 'findBackgroundImage' is async. We can't do async inside setGames.
-        // So we must prepare the game data outside.
-
-        // Let's modify the strategy:
-        // 1. Prepare ALL potential new game objects (with images) assuming they are new.
-        // 2. Perform a functional state update that merges them, checking against 'prev'.
-
+        // findBackgroundImage is async, so game objects (with images) are prepared
+        // ahead of the functional state update that merges them against 'prev'.
         const potentialNewGames = await Promise.all(discoveredGames.map(async (d) => {
             const coverImage = await findBackgroundImage(d.name, getImagesDirectory(), apiUrl);
             return {
@@ -316,21 +277,6 @@ export function useGames(apiUrl: string) {
 
     const removeGamesByEmulator = useCallback((emulatorId: string) => {
         setGames(prev => prev.filter(game => game.emulator !== emulatorId));
-        setRecents(prev => prev.filter(r => {
-            // We can't access 'games' here reliably if we want strictly consistent atomic update
-            // But recents stores ID. We need to cross-ref.
-            // Best effort:
-            return true; // We rely on a separate cleanup or just accept loose recents for a moment
-        }));
-        // Actually, we should clean recents properly.
-        // Let's do it in a useEffect or similar?
-        // Or just let 'cleanupOrphanedGames' handle it.
-        // For now, let's leave recents cleanup as best-effort based on current 'games' which might be stale?
-        // No, we can just filter recents by ID if we knew which IDs were removed.
-        // But we don't know IDs inside the functional update easily.
-        // Let's just update games. Recents will point to non-existent games, which 'getRecentGames' filters out anyway!
-        // "getRecentGames" -> games.find(g => g.id === r.gameId). If undefined, it filters it out.
-        // So we don't strictly NEED to remove from recents state immediately to prevent crashes.
     }, []);
 
     const cleanupOrphanedGames = useCallback((currentEmulators: Array<{ name: string }>) => {
