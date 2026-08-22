@@ -38,6 +38,11 @@ async function ensureImagesDir() {
 const pickFileScript = path.join(__dirname, 'scripts', 'PickFile.ps1');
 const pickFolderScript = path.join(__dirname, 'scripts', 'PickFolder.ps1');
 
+// Virtual controller aggregator (ViGEm) - any physical pad drives one
+// stable virtual pad that emulators are configured against.
+const { VirtualPadAggregator } = require('./virtualPad');
+const virtualPad = new VirtualPadAggregator();
+
 // IGDB API Configuration
 let igdbAccessToken = null;
 let igdbTokenExpiry = 0;
@@ -365,8 +370,13 @@ app.post('/launch', async (req, res) => {
         // Template tokens in script values, ported from the original EmuCenter's
         // command_cleaner: 'vcontroller' becomes the preferred controller index,
         // 'emupath' the directory of the (quoted) emulator executable. The main
-        // command is left untouched, faithful to the original.
-        const vcontroller = String(Number.isInteger(preferredController) ? preferredController : -1);
+        // command is left untouched, faithful to the original. When the virtual
+        // pad aggregator is running, its slot wins over the manual setting -
+        // that is the whole point: emulators bind to the stable virtual pad.
+        const aggregatorSlot = virtualPad.running ? virtualPad.slot : -1;
+        const vcontroller = String(aggregatorSlot >= 0
+            ? aggregatorSlot
+            : (Number.isInteger(preferredController) ? preferredController : -1));
         const exeMatch = mainCommand.match(/^\s*"([^"]+)"/);
         const emupath = exeMatch ? path.dirname(exeMatch[1]) : '';
         for (const script of scripts) {
@@ -652,6 +662,29 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * GET /virtual-pad
+ * Status of the virtual controller aggregator
+ */
+app.get('/virtual-pad', (req, res) => {
+    res.json({ success: true, status: virtualPad.getStatus() });
+});
+
+/**
+ * POST /virtual-pad
+ * Enable or disable the aggregator. Body: { enabled: boolean }
+ */
+app.post('/virtual-pad', async (req, res) => {
+    try {
+        const { enabled } = req.body;
+        const status = enabled ? await virtualPad.start() : await virtualPad.stop();
+        res.json({ success: !status.error, status });
+    } catch (error) {
+        console.error('[VirtualPad] toggle error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * Execute a platform-specific dialog command
  */
 async function runDialogCommand(command) {
@@ -873,12 +906,25 @@ app.delete('/delete-image', async (req, res) => {
     }
 });
 
+// Re-enable the aggregator on boot if the saved settings ask for it
+async function restoreVirtualPad() {
+    try {
+        const data = await fs.readFile(path.join(CONFIG_DIR, 'settings.json'), 'utf8');
+        const settings = JSON.parse(data);
+        if (settings && settings.virtualPadEnabled) {
+            console.log('[VirtualPad] Restoring aggregator from saved settings...');
+            await virtualPad.start();
+        }
+    } catch { /* no settings yet, or aggregator unavailable */ }
+}
+
 ensureImagesDir().then(() => {
     app.listen(PORT, () => {
         console.log(`EmuCenter backend running on port ${PORT} `);
         console.log(`Platform: ${platform} `);
         console.log(`Images directory: ${IMAGES_DIR}`);
         console.log(`Ready to launch applications!`);
+        restoreVirtualPad();
     });
 });
 
