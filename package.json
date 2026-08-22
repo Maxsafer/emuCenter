@@ -70,11 +70,12 @@
       "web-build/assets/node_modules/**"
     ],
     "mac": {
-      "category": "public.app-category.games"
+      "category": "public.app-category.games",
+      "icon": "build/icon.png"
     },
     "win": {
       "target": "nsis",
-      "signAndEditExecutable": false
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -83,7 +84,9 @@
       "createStartMenuShortcut": true
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Game"
     }
   },
   "private": true

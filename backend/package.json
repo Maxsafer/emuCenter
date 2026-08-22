@@ -12,12 +12,14 @@
         "games",
         "emulator"
     ],
-    "author": "",
-    "license": "MIT",
+    "author": "Maxsafer",
+    "license": "GPL-3.0",
     "dependencies": {
         "cors": "^2.8.5",
         "express": "^4.18.2",
-        "multer": "^2.0.2",
+        "multer": "^2.0.2"
+    },
+    "optionalDependencies": {
         "vigemclient": "^1.5.3",
         "xinput-ffi": "^4.0.2"
     },

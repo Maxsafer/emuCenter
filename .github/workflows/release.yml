@@ -1,0 +1,65 @@
+# Builds installers for Windows, macOS, and Linux and attaches them to a
+# draft GitHub Release whenever a version tag (v*) is pushed.
+#
+#   git tag v3.0.0 && git push origin v3.0.0
+#
+# Review the draft release on GitHub, then publish it.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      # vigemclient (virtual controller, Windows-only) is an optional
+      # dependency so installs succeed on macOS/Linux. On Windows, make sure
+      # it actually compiled - build it with upstream node-gyp if it didn't
+      # (the electron fork of node-gyp wants the ClangCL toolset).
+      - name: Ensure vigemclient built (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (!(Test-Path "backend/node_modules/vigemclient/build/Release/vigemclient.node")) {
+            Set-Location backend/node_modules/vigemclient
+            npx --yes node-gyp@11 rebuild
+          }
+          if (!(Test-Path "backend/node_modules/vigemclient/build/Release/vigemclient.node")) {
+            Write-Error "vigemclient failed to build - Windows installer would ship without the virtual controller"
+            exit 1
+          }
+
+      - name: Build installer
+        run: npm run dist
+
+      - name: Attach to draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage

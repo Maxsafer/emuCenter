@@ -29,7 +29,9 @@ Grab the latest `EmuCenter-Setup-x.x.x.exe` from the [Releases](../../releases) 
 
 > **Windows SmartScreen:** the installer is not code-signed (certificates are expensive for a free project), so Windows will show *"Windows protected your PC"*. Click **More info → Run anyway**. The source code is right here if you want to audit or build it yourself.
 
-**Optional — virtual controller:** the *Virtual controller* feature (one stable controller that any physical pad drives, see [below](#virtual-controller)) requires the [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) driver by [nefarius](https://github.com/nefarius). Everything else works without it — if the driver is missing, EmuCenter simply tells you so in Settings.
+**Optional — virtual controller (Windows only):** the *Virtual controller* feature (one stable controller that any physical pad drives, see [below](#virtual-controller)) requires the [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) driver by [nefarius](https://github.com/nefarius). Everything else works without it — if the driver is missing, EmuCenter simply tells you so in Settings. On macOS and Linux this feature is unavailable (no ViGEmBus equivalent exists); the rest of the app works the same.
+
+**macOS note:** the app is not notarized (Apple charges for that), so the first launch needs a right-click → **Open** instead of a double-click.
 
 Your library, settings and uploaded covers live in `%APPDATA%\EmuCenter`, so reinstalling or updating never touches your setup.
 
