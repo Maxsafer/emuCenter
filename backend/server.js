@@ -13,6 +13,28 @@ const platform = os.platform();
 const CONFIG_DIR = (process.env.IS_ELECTRON && process.env.USER_DATA_PATH)
     ? path.join(process.env.USER_DATA_PATH, 'config')
     : path.join(__dirname, 'config');
+
+// Images live next to the source in dev, but under userData when packaged —
+// the install dir may be read-only, so uploads must land in USER_DATA_PATH.
+const BUNDLED_IMAGES_DIR = path.join(__dirname, 'images');
+const IMAGES_DIR = (process.env.IS_ELECTRON && process.env.USER_DATA_PATH)
+    ? path.join(process.env.USER_DATA_PATH, 'images')
+    : BUNDLED_IMAGES_DIR;
+
+async function ensureImagesDir() {
+    if (IMAGES_DIR === BUNDLED_IMAGES_DIR) return;
+    await fs.mkdir(IMAGES_DIR, { recursive: true });
+    try {
+        // One-time, non-destructive seed of bundled defaults (logo.png etc.)
+        for (const f of await fs.readdir(BUNDLED_IMAGES_DIR)) {
+            const dest = path.join(IMAGES_DIR, f);
+            try { await fs.access(dest); } catch { await fs.copyFile(path.join(BUNDLED_IMAGES_DIR, f), dest); }
+        }
+    } catch (e) {
+        console.warn('[Images] seed failed:', e.message);
+    }
+}
+
 const pickFileScript = path.join(__dirname, 'scripts', 'PickFile.ps1');
 const pickFolderScript = path.join(__dirname, 'scripts', 'PickFolder.ps1');
 
@@ -48,7 +70,7 @@ app.use(cors());
 app.use(express.json());
 
 // Serve images as static files
-app.use('/images', express.static(path.join(__dirname, 'images')));
+app.use('/images', express.static(IMAGES_DIR));
 
 /**
  * Get IGDB access token (cached, auto-refreshes)
@@ -504,7 +526,7 @@ app.get('/game-image/:gameName', async (req, res) => {
         const cleanedName = cleanGameName(gameName);
         const cleanedNameLower = cleanedName.toLowerCase();
 
-        const imagesDir = path.join(__dirname, 'images');
+        const imagesDir = IMAGES_DIR;
 
         // Check if images directory exists
         if (!require('fs').existsSync(imagesDir)) {
@@ -752,7 +774,7 @@ const multer = require('multer');
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, 'images'));
+        cb(null, IMAGES_DIR);
     },
     filename: function (req, file, cb) {
         // Use game name from body if available, otherwise original name
@@ -810,7 +832,7 @@ app.delete('/delete-image', async (req, res) => {
         }
 
         const cleanedName = cleanGameName(gameName);
-        const imagesDir = path.join(__dirname, 'images');
+        const imagesDir = IMAGES_DIR;
 
         // Find matching files
         const files = await fs.readdir(imagesDir);
@@ -843,9 +865,12 @@ app.delete('/delete-image', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`EmuCenter backend running on port ${PORT} `);
-    console.log(`Platform: ${platform} `);
-    console.log(`Ready to launch applications!`);
+ensureImagesDir().then(() => {
+    app.listen(PORT, () => {
+        console.log(`EmuCenter backend running on port ${PORT} `);
+        console.log(`Platform: ${platform} `);
+        console.log(`Images directory: ${IMAGES_DIR}`);
+        console.log(`Ready to launch applications!`);
+    });
 });
 
