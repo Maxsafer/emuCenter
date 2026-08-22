@@ -285,11 +285,6 @@ app.delete('/config/:key', async (req, res) => {
     }
 });
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', platform });
-});
-
 /**
  * Parse command to handle scripts (pre/post launch commands)
  * Format: "main_command?script1:arg1=value1,script2:arg2=value2"
@@ -670,7 +665,7 @@ async function runDialogCommand(command) {
  */
 app.post('/pick-file', async (req, res) => {
     try {
-        let path = null;
+        let selectedPath = null;
 
         if (platform === 'darwin') {
             // macOS - Use AppleScript via osascript
@@ -678,7 +673,7 @@ app.post('/pick-file', async (req, res) => {
                 set selectedFile to choose file with prompt "Select Emulator Executable" of type {"public.unix-executable", "com.apple.application-bundle", "public.executable", "public.data"}
                 POSIX path of selectedFile
             `;
-            path = await runDialogCommand(`osascript -e '${script}'`);
+            selectedPath = await runDialogCommand(`osascript -e '${script}'`);
 
         } else if (platform === 'win32') {
             // Windows - Use PowerShell script
@@ -693,17 +688,17 @@ app.post('/pick-file', async (req, res) => {
                     }
                 });
             });
-            path = stdout.trim();
+            selectedPath = stdout.trim();
 
         } else if (platform === 'linux') {
             // Linux - Use Zenity (must be installed) or KDialog
             // Try Zenity first
-            path = await runDialogCommand('zenity --file-selection --title="Select Emulator Executable"');
+            selectedPath = await runDialogCommand('zenity --file-selection --title="Select Emulator Executable"');
         }
 
-        if (path) {
-            console.log(`[Picker] Selected file: ${path}`);
-            res.json({ success: true, path });
+        if (selectedPath) {
+            console.log(`[Picker] Selected file: ${selectedPath}`);
+            res.json({ success: true, path: selectedPath });
         } else {
             console.log('[Picker] Selection cancelled');
             res.json({ success: false, cancelled: true });
@@ -721,7 +716,7 @@ app.post('/pick-file', async (req, res) => {
  */
 app.post('/pick-directory', async (req, res) => {
     try {
-        let path = null;
+        let selectedPath = null;
 
         if (platform === 'darwin') {
             // macOS
@@ -729,7 +724,7 @@ app.post('/pick-directory', async (req, res) => {
                 set selectedFolder to choose folder with prompt "Select Games Directory"
                 POSIX path of selectedFolder
             `;
-            path = await runDialogCommand(`osascript -e '${script}'`);
+            selectedPath = await runDialogCommand(`osascript -e '${script}'`);
 
         } else if (platform === 'win32') {
             // Windows - PowerShell FolderBrowserDialog
@@ -744,19 +739,19 @@ app.post('/pick-directory', async (req, res) => {
                     }
                 });
             });
-            path = stdout.trim();
+            selectedPath = stdout.trim();
 
         } else if (platform === 'linux') {
             // Linux - Zenity
-            path = await runDialogCommand('zenity --file-selection --directory --title="Select Games Directory"');
+            selectedPath = await runDialogCommand('zenity --file-selection --directory --title="Select Games Directory"');
         }
 
-        if (path) {
+        if (selectedPath) {
             // Remove trailing slash if present (common in macOS output)
-            if (path.endsWith(path.sep)) path = path.slice(0, -1);
+            if (selectedPath.endsWith(path.sep)) selectedPath = selectedPath.slice(0, -1);
 
-            console.log(`[Picker] Selected directory: ${path}`);
-            res.json({ success: true, path });
+            console.log(`[Picker] Selected directory: ${selectedPath}`);
+            res.json({ success: true, path: selectedPath });
         } else {
             console.log('[Picker] Selection cancelled');
             res.json({ success: false, cancelled: true });
