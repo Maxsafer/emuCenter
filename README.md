@@ -25,9 +25,13 @@ I specifically made this for my need of having an emulator game hub for my Ayane
 
 # !! Download-and-Install
 
-Grab the latest `EmuCenter-Setup-x.x.x.exe` from the [Releases](../../releases) page and run it. No other software is required to browse and launch games.
+Grab the latest release for your platform from the [Releases](../../releases) page — no other software is required to browse and launch games:
 
-> **Windows SmartScreen:** the installer is not code-signed (certificates are expensive for a free project), so Windows will show *"Windows protected your PC"*. Click **More info → Run anyway**. The source code is right here if you want to audit or build it yourself.
+|Platform|File|Note|
+|--|--|--|
+|Windows|`EmuCenter Setup x.x.x.exe`|SmartScreen will warn because the installer is not code-signed (certificates are expensive for a free project) — click **More info → Run anyway**|
+|macOS|`EmuCenter-x.x.x.dmg`|Not notarized — first launch needs right-click → **Open**|
+|Linux|`EmuCenter-x.x.x.AppImage`|`chmod +x` and run; some distros need `libfuse2` for AppImages|
 
 **Optional — virtual controller (Windows only):** the *Virtual controller* feature (one stable controller that any physical pad drives, see [below](#virtual-controller)) requires the [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) driver by [nefarius](https://github.com/nefarius). Everything else works without it — if the driver is missing, EmuCenter simply tells you so in Settings. On macOS and Linux this feature is unavailable (no ViGEmBus equivalent exists); the rest of the app works the same.
 
@@ -137,7 +141,9 @@ For developers (end users: just use the installer):
     # frontend (second terminal)
     npm install && npm run web        # dev server on http://localhost:8081
 
-    npm run dist                      # builds the Windows installer into release/
+    npm run dist                      # builds the installer into release/
+
+`npm run dist` builds the installer **for the OS it runs on**: NSIS `.exe` on Windows, `.dmg` on macOS, AppImage on Linux (needs Node 20+). Run `npm install` fresh on each platform — never copy `node_modules` between OSes. The Windows-only virtual-controller module is an optional dependency and is skipped automatically elsewhere.
 
 Stack: Expo/React Native Web frontend, Express backend (scanning, launching, covers, native pickers), Electron shell. The virtual controller uses [ViGEmBus](https://github.com/nefarius/ViGEmBus) through `vigemclient` and `xinput-ffi`.
 
