@@ -62,7 +62,8 @@
       "web-build/**/*",
       "backend/**/*",
       "!backend/config/**",
-      "electron-main.js"
+      "electron-main.js",
+      "preload.js"
     ],
     "mac": {
       "category": "public.app-category.games"

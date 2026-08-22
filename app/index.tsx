@@ -12,6 +12,7 @@ import { useNavSound } from '@/hooks/useNavSound';
 import { useSettings } from '@/hooks/useSettings';
 import { useVirtualPad } from '@/hooks/useVirtualPad';
 import { Game, GameFilterMode } from '@/types';
+import { getDesktopBridge } from '@/utils/desktop';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -263,23 +264,48 @@ export default function HomeScreen() {
     setSortBy(settings.sortBy === 'alphabetical' ? 'emulator' : 'alphabetical');
   };
 
-  // Browser/Electron fullscreen (the HTML5 API drives the Electron window too)
+  // Fullscreen: in Electron this MUST go through the native bridge - the
+  // HTML5 API cannot see or exit a window that booted natively fullscreen
+  // (fullscreenOnStart). The browser dev tab falls back to the HTML5 API.
+  const desktop = React.useMemo(() => getDesktopBridge(), []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   React.useEffect(() => {
+    if (desktop) {
+      desktop.isFullscreen().then(setIsFullscreen).catch(() => {});
+      desktop.onFullscreenChange(setIsFullscreen);
+      return;
+    }
     if (typeof document === 'undefined') return;
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+  }, [desktop]);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = React.useCallback(() => {
+    if (desktop) {
+      desktop.toggleFullscreen().catch(() => {});
+      return;
+    }
     if (typeof document === 'undefined') return;
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     } else {
       document.documentElement.requestFullscreen().catch(() => {});
     }
-  };
+  }, [desktop]);
+
+  // F11 works in the packaged app too (browsers handle it natively)
+  React.useEffect(() => {
+    if (!desktop || typeof window === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [desktop, toggleFullscreen]);
 
   const cycleTab = (direction: 'left' | 'right') => {
     const currentIndex = TAB_CONFIG.findIndex(t => t.key === currentTab);

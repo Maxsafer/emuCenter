@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fork } = require('child_process');
@@ -34,16 +34,31 @@ async function createWindow() {
         fullscreen: readUserSetting('fullscreenOnStart', false),
         autoHideMenuBar: true, // launcher look; Alt shows the menu
         webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false, // Security best practice
             contextIsolation: true,
         }
     });
+
+    // Keep the renderer's fullscreen button in sync with native state
+    mainWindow.on('enter-full-screen', () => mainWindow.webContents.send('fullscreen:changed', true));
+    mainWindow.on('leave-full-screen', () => mainWindow.webContents.send('fullscreen:changed', false));
 
     // Load the built frontend via electron-serve
     await loadURL(mainWindow);
 
     // Open DevTools for debugging
 }
+
+// Desktop bridge (see preload.js) - the renderer toggles NATIVE fullscreen,
+// which the HTML5 fullscreen API cannot exit when set at window creation.
+ipcMain.handle('fullscreen:toggle', () => {
+    if (!mainWindow) return false;
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+    return mainWindow.isFullScreen();
+});
+ipcMain.handle('fullscreen:get', () => (mainWindow ? mainWindow.isFullScreen() : false));
+ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 
 function startBackend() {
     // Spawn the existing server.js as a child process
