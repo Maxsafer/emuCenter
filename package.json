@@ -63,14 +63,23 @@
       "backend/**/*",
       "!backend/config/**",
       "electron-main.js",
-      "preload.js"
+      "preload.js",
+      "!node_modules/**",
+      "node_modules/electron-serve/**",
+      "backend/node_modules/**"
     ],
     "mac": {
       "category": "public.app-category.games"
     },
     "win": {
-      "target": "dir",
+      "target": "nsis",
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "linux": {
       "target": "AppImage"

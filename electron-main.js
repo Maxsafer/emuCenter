@@ -33,6 +33,7 @@ async function createWindow() {
         height: 800,
         fullscreen: readUserSetting('fullscreenOnStart', false),
         autoHideMenuBar: true, // launcher look; Alt shows the menu
+        icon: path.join(__dirname, 'backend', 'images', 'logo.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false, // Security best practice
