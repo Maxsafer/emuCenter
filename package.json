@@ -1,7 +1,9 @@
 {
-  "name": "test-app",
+  "name": "emucenter",
+  "description": "EmuCenter - emulator and game launcher",
+  "author": "Maxsafer",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -47,8 +49,11 @@
     "typescript": "~5.9.2"
   },
   "build": {
+    "appId": "com.emucenter.app",
+    "productName": "EmuCenter",
+    "asar": false,
     "directories": {
-      "output": "release-v3"
+      "output": "release"
     },
     "extraMetadata": {
       "main": "electron-main.js"
@@ -56,14 +61,15 @@
     "files": [
       "web-build/**/*",
       "backend/**/*",
+      "!backend/config/**",
       "electron-main.js"
     ],
-    "appId": "com.emucenter.app",
     "mac": {
       "category": "public.app-category.games"
     },
     "win": {
-      "target": "dir"
+      "target": "dir",
+      "signAndEditExecutable": false
     },
     "linux": {
       "target": "AppImage"
