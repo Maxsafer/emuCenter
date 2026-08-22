@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 
 interface TabIndicatorProps {
     currentTab: GameFilterMode;
-    tabs: Array<{ key: GameFilterMode; label: string }>;
+    tabs: { key: GameFilterMode; label: string }[];
 }
 
 export function TabIndicator({ currentTab, tabs, onTabSelect }: TabIndicatorProps & { onTabSelect: (tab: GameFilterMode) => void }) {

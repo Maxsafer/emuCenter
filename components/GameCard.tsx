@@ -19,9 +19,21 @@ interface GameCardProps {
     onToggleFavorite: (id: string) => void;
     simplifiedUI?: boolean;
     apiUrl?: string;
+    /** Controller-navigation selection highlight */
+    selected?: boolean;
+    /** Lets the grid scroll the selected card into view (web DOM node) */
+    registerRef?: (id: string, node: unknown) => void;
 }
 
-export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = false, apiUrl = DEFAULT_API_URL }: GameCardProps) {
+export const GameCard = React.memo(function GameCard({
+    game,
+    onLaunch,
+    onToggleFavorite,
+    simplifiedUI = false,
+    apiUrl = DEFAULT_API_URL,
+    selected = false,
+    registerRef,
+}: GameCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [imageError, setImageError] = useState(false);
     // Cover refresh without a page reload: an uploaded cover's direct URL
@@ -130,6 +142,7 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
 
     return (
         <Animated.View
+            ref={(node) => registerRef?.(game.id, node)}
             entering={FadeIn.duration(400)}
             exiting={FadeOut}
             layout={Layout.springify()}
@@ -271,12 +284,13 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
                 <View style={[
                     styles.glowBorder,
                     game.isFavorite && styles.glowBorderFavorite,
-                    isHovered && styles.glowBorderHover
+                    isHovered && styles.glowBorderHover,
+                    selected && styles.glowBorderSelected
                 ]} pointerEvents="none" />
             </View>
         </Animated.View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     container: {
@@ -411,5 +425,14 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.6,
         shadowRadius: 16,
+    },
+    // Controller selection - the original's 3px cyan border
+    glowBorderSelected: {
+        borderColor: '#00FAFF',
+        borderWidth: 3,
+        shadowColor: '#00FAFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.7,
+        shadowRadius: 14,
     },
 });

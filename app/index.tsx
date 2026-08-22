@@ -6,6 +6,8 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { TabIndicator } from '@/components/TabIndicator';
 import { useEmulators } from '@/hooks/useEmulators';
 import { useGames } from '@/hooks/useGames';
+import { useGridSelection } from '@/hooks/useGridSelection';
+import { useInputSystem } from '@/hooks/useInputSystem';
 import { useSettings } from '@/hooks/useSettings';
 import { Game, GameFilterMode } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +40,10 @@ const TAB_CONFIG = [
   { key: 'favorites' as GameFilterMode, label: 'FAVORITES' },
   { key: 'recents' as GameFilterMode, label: 'RECENT' },
 ];
+
+const GRID_COLUMNS = 6;
+// Placeholder until sections become collapsible
+const NO_COLLAPSED_SECTIONS: ReadonlySet<string> = new Set();
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -292,6 +298,79 @@ export default function HomeScreen() {
     return groups;
   }, [filteredGames, settings.sortBy]);
 
+  // --- Controller / keyboard navigation ---
+  const {
+    selectedId,
+    selectedGame,
+    selectedSectionIndex,
+    move: moveSelection,
+    clear: clearSelection,
+  } = useGridSelection({
+    sections,
+    collapsedTitles: NO_COLLAPSED_SECTIONS,
+    columns: GRID_COLUMNS,
+  });
+
+  const inputEnabled = !settingsVisible && !addEmulatorVisible && !manageEmulatorsVisible;
+
+  const { inputMode } = useInputSystem({
+    enabled: inputEnabled,
+    onAction: (action) => {
+      switch (action.type) {
+        case 'direction':
+          moveSelection(action.dir);
+          break;
+        case 'accept':
+          if (selectedGame) handleLaunch(selectedGame);
+          break;
+        case 'favorite':
+          if (selectedGame) toggleFavorite(selectedGame.id);
+          break;
+        case 'sort':
+          toggleSort();
+          break;
+        case 'tabLeft':
+          cycleTab('left');
+          break;
+        case 'tabRight':
+          cycleTab('right');
+          break;
+        case 'info':
+          // Wired to expand/collapse-all once sections are collapsible
+          break;
+        case 'back':
+          clearSelection();
+          break;
+      }
+    },
+  });
+
+  // Selection resets when the visible tab changes
+  React.useEffect(() => {
+    clearSelection();
+  }, [currentTab, clearSelection]);
+
+  // Card DOM nodes for scroll-into-view (react-native-web View refs are HTMLElements)
+  const cardNodes = React.useRef(new Map<string, unknown>());
+  const registerCardRef = React.useCallback((id: string, node: unknown) => {
+    if (node) {
+      cardNodes.current.set(id, node);
+    } else {
+      cardNodes.current.delete(id);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const node = cardNodes.current.get(selectedId) as { scrollIntoView?: (opts: object) => void } | undefined;
+    if (node && typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else if (selectedSectionIndex != null && scrollRef.current) {
+      // Virtualized-away card: jump by section, close enough to mount it
+      scrollRef.current.scrollToIndex({ index: selectedSectionIndex, viewPosition: 0.3 });
+    }
+  }, [selectedId, selectedSectionIndex]);
+
   const renderSection = ({ item }: { item: { title: string; data: typeof filteredGames } }) => {
     // Determine icon based on sort mode
     const icon = settings.sortBy === 'emulator' ? 'game-controller' : undefined;
@@ -308,6 +387,8 @@ export default function HomeScreen() {
               onToggleFavorite={toggleFavorite}
               simplifiedUI={settings.simplifiedUI}
               apiUrl={settings.apiUrl}
+              selected={inputMode === 'controller' && game.id === selectedId}
+              registerRef={registerCardRef}
             />
           ))}
         </View>
