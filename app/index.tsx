@@ -8,6 +8,7 @@ import { useEmulators } from '@/hooks/useEmulators';
 import { useGames } from '@/hooks/useGames';
 import { useGridSelection } from '@/hooks/useGridSelection';
 import { useInputSystem } from '@/hooks/useInputSystem';
+import { useNavSound } from '@/hooks/useNavSound';
 import { useSettings } from '@/hooks/useSettings';
 import { useVirtualPad } from '@/hooks/useVirtualPad';
 import { Game, GameFilterMode } from '@/types';
@@ -47,7 +48,8 @@ const GRID_COLUMNS = 6;
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { settings, setSortBy, setSimplifiedUI, setPreferredController, setVirtualPadEnabled } = useSettings();
+  const { settings, setSortBy, setSimplifiedUI, setPreferredController, setVirtualPadEnabled, setNavSoundVolume } = useSettings();
+  const playNavSound = useNavSound(settings.apiUrl, settings.navSoundVolume);
   const { status: virtualPadStatus, setEnabled: setVirtualPadBackend } = useVirtualPad(settings.apiUrl);
 
   const handleToggleVirtualPad = async (value: boolean) => {
@@ -396,6 +398,15 @@ export default function HomeScreen() {
     clearSelection();
   }, [currentTab, clearSelection]);
 
+  // Navigation sound on selection change (like the original EmuCenter)
+  const prevSelectedIdRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (selectedId && selectedId !== prevSelectedIdRef.current) {
+      playNavSound();
+    }
+    prevSelectedIdRef.current = selectedId;
+  }, [selectedId, playNavSound]);
+
   // Card DOM nodes for scroll-into-view (react-native-web View refs are HTMLElements)
   const cardNodes = React.useRef(new Map<string, unknown>());
   const registerCardRef = React.useCallback((id: string, node: unknown) => {
@@ -571,6 +582,8 @@ export default function HomeScreen() {
         apiUrl={settings.apiUrl}
         simplifiedUI={settings.simplifiedUI}
         onToggleSimplifiedUI={setSimplifiedUI}
+        navSoundVolume={settings.navSoundVolume}
+        onSetNavSoundVolume={setNavSoundVolume}
         sortBy={settings.sortBy}
         onToggleSort={toggleSort}
         emulatorCount={emulators.length}

@@ -5,6 +5,7 @@ import React from 'react';
 import {
     Linking,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -19,6 +20,8 @@ interface SettingsModalProps {
     onClose: () => void;
     simplifiedUI: boolean;
     onToggleSimplifiedUI: (value: boolean) => void;
+    navSoundVolume: number;
+    onSetNavSoundVolume: (volume: number) => void;
     sortBy: 'alphabetical' | 'emulator';
     onToggleSort: () => void;
     emulatorCount: number;
@@ -38,6 +41,8 @@ export function SettingsModal({
     onClose,
     simplifiedUI,
     onToggleSimplifiedUI,
+    navSoundVolume,
+    onSetNavSoundVolume,
     sortBy,
     onToggleSort,
     emulatorCount,
@@ -198,6 +203,26 @@ export function SettingsModal({
                                 trackColor={{ false: '#334155', true: '#3B82F6' }}
                                 thumbColor={simplifiedUI ? '#F8FAFC' : '#94A3B8'}
                             />
+                        </View>
+
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>Navigation volume</Text>
+                                <Text style={styles.settingDescription}>
+                                    Sound played when moving the selection ({navSoundVolume}%)
+                                </Text>
+                            </View>
+                            {Platform.OS === 'web' && (
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    value={navSoundVolume}
+                                    onChange={(e) => onSetNavSoundVolume(Number(e.target.value))}
+                                    style={{ width: 130, accentColor: '#3B82F6', cursor: 'pointer' }}
+                                />
+                            )}
                         </View>
                     </View>
 

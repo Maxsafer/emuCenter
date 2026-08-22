@@ -5,6 +5,10 @@ const { fork } = require('child_process');
 const serveLib = require('electron-serve');
 const serve = serveLib.default || serveLib;
 
+// Gamepad input is not a DOM user gesture, so without this Chrome's
+// autoplay policy would silently block the navigation sound.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 const loadURL = serve({ directory: 'web-build' });
 
 let mainWindow;

@@ -77,6 +77,9 @@ app.use(express.json());
 // Serve images as static files
 app.use('/images', express.static(IMAGES_DIR));
 
+// Bundled UI sounds (read-only, so no USER_DATA_PATH indirection needed)
+app.use('/sounds', express.static(path.join(__dirname, 'sounds')));
+
 /**
  * Get IGDB access token (cached, auto-refreshes)
  */
