@@ -13,5 +13,13 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "release-packager",
+    "release-v3",
+    "release",
+    "dist",
+    "web-build"
   ]
 }
