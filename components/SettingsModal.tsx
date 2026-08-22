@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    Alert,
     Linking,
     Modal,
     Pressable,
@@ -44,6 +43,21 @@ export function SettingsModal({
     const [igdbClientId, setIgdbClientId] = React.useState('');
     const [igdbClientSecret, setIgdbClientSecret] = React.useState('');
     const [igdbExpanded, setIgdbExpanded] = React.useState(false);
+    // Inline save feedback - Alert.alert is a no-op on react-native-web
+    const [igdbStatus, setIgdbStatus] = React.useState<'idle' | 'saved' | 'error'>('idle');
+    const igdbStatusTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    React.useEffect(() => {
+        return () => {
+            if (igdbStatusTimer.current) clearTimeout(igdbStatusTimer.current);
+        };
+    }, []);
+
+    const showIgdbStatus = (status: 'saved' | 'error') => {
+        setIgdbStatus(status);
+        if (igdbStatusTimer.current) clearTimeout(igdbStatusTimer.current);
+        igdbStatusTimer.current = setTimeout(() => setIgdbStatus('idle'), 3000);
+    };
 
     // Load IGDB config on open
     React.useEffect(() => {
@@ -73,13 +87,9 @@ export function SettingsModal({
                 })
             });
             const result = await response.json();
-            if (result.success) {
-                Alert.alert('Success', 'IGDB credentials saved!');
-            } else {
-                Alert.alert('Error', 'Failed to save credentials.');
-            }
+            showIgdbStatus(result.success ? 'saved' : 'error');
         } catch (e) {
-            Alert.alert('Error', 'Failed to save credentials.');
+            showIgdbStatus('error');
         }
     };
 
@@ -235,6 +245,12 @@ export function SettingsModal({
                                 <Pressable style={styles.saveButton} onPress={handleSaveIgdb}>
                                     <Text style={styles.saveButtonText}>Save Credentials</Text>
                                 </Pressable>
+
+                                {igdbStatus !== 'idle' && (
+                                    <Text style={igdbStatus === 'saved' ? styles.statusSaved : styles.statusError}>
+                                        {igdbStatus === 'saved' ? 'Credentials saved' : 'Failed to save credentials'}
+                                    </Text>
+                                )}
                             </View>
                         )}
                     </View>
@@ -444,5 +460,19 @@ const styles = StyleSheet.create({
         color: '#60A5FA',
         fontWeight: '600',
         fontSize: 14,
+    },
+    statusSaved: {
+        color: '#10B981',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 10,
+    },
+    statusError: {
+        color: '#EF4444',
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 10,
     },
 });
