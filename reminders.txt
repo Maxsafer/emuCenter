@@ -1,0 +1,22 @@
+nvm install --lts
+nvm use --lts
+
+node -v
+npm -v
+
+npm install -g expo
+
+✅ Your project is ready!
+
+To run your project, run one of the following npm commands.
+
+- npm run android
+- npm run ios # you need to use macOS to build the iOS project - use the Expo app if you need to do iOS development without a Mac
+- npm run web
+
+
+Backend:
+- npm start
+
+Packaging to OS:
+- packaging_guide.md
