@@ -3,7 +3,9 @@
  * Replaces AsyncStorage for cross-browser/device persistence
  */
 
-const API_URL = 'http://localhost:3001';
+import { DEFAULT_API_URL } from '@/types';
+
+const API_URL = DEFAULT_API_URL;
 
 export const BackendStorage = {
     /**

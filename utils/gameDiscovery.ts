@@ -1,4 +1,4 @@
-import { Emulator } from '@/types';
+import { DEFAULT_API_URL, Emulator } from '@/types';
 
 /**
  * Scan an emulator's games directory and return discovered game files
@@ -6,7 +6,7 @@ import { Emulator } from '@/types';
  */
 export async function discoverGames(
     emulator: Emulator,
-    apiUrl: string = 'http://localhost:3001'
+    apiUrl: string = DEFAULT_API_URL
 ): Promise<{
     games: Array<{ name: string; path: string }>;
     errors: string[];

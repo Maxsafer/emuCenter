@@ -1,8 +1,10 @@
+import { DEFAULT_API_URL } from '@/types';
+
 /**
  * Get image URL for a game - uses backend smart matching
  * Returns the URL to request from backend
  */
-export function getGameImageUrl(gameName: string, apiUrl: string = 'http://localhost:3001'): string {
+export function getGameImageUrl(gameName: string, apiUrl: string = DEFAULT_API_URL): string {
     return `${apiUrl}/game-image/${encodeURIComponent(gameName)}`;
 }
 
@@ -20,7 +22,7 @@ export function getImagesDirectory(): string {
 export async function findBackgroundImage(
     gameName: string,
     _imagesDirectory: string,
-    apiUrl: string = 'http://localhost:3001'
+    apiUrl: string = DEFAULT_API_URL
 ): Promise<string | null> {
     // Simply return the game-image URL - backend does the matching
     return getGameImageUrl(gameName, apiUrl);

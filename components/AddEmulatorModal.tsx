@@ -11,7 +11,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { Emulator } from '../types';
+import { DEFAULT_API_URL, Emulator } from '../types';
 
 interface AddEmulatorModalProps {
     visible: boolean;
@@ -28,8 +28,7 @@ interface AddEmulatorModalProps {
     initialData?: Emulator | null;
 }
 
-// Backend API URL (assumed based on context, ideally passed via props or context)
-const API_URL = 'http://localhost:3001';
+const API_URL = DEFAULT_API_URL;
 
 export function AddEmulatorModal({ visible, onClose, onAdd, onScan, initialData }: AddEmulatorModalProps) {
     const [name, setName] = useState('');

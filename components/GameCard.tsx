@@ -1,4 +1,4 @@
-import { Game } from '@/types';
+import { DEFAULT_API_URL, Game } from '@/types';
 import { getGameImageUrl } from '@/utils/imageMatching';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,9 +18,10 @@ interface GameCardProps {
     onLaunch: (game: Game) => void;
     onToggleFavorite: (id: string) => void;
     simplifiedUI?: boolean;
+    apiUrl?: string;
 }
 
-export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = false }: GameCardProps) {
+export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = false, apiUrl = DEFAULT_API_URL }: GameCardProps) {
     const [isHovered, setIsHovered] = useState(false);
     const [imageError, setImageError] = useState(false);
     const scale = useSharedValue(1);
@@ -33,7 +34,7 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
     const dynamicLineHeight = dynamicTitleSize * 1.2;
 
     // Always try to load image dynamically from backend
-    const imageUrl = getGameImageUrl(game.name);
+    const imageUrl = getGameImageUrl(game.name, apiUrl);
     const showImage = !simplifiedUI && !imageError;
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -60,7 +61,7 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
         formData.append('image', file);
 
         try {
-            const response = await fetch('http://localhost:3001/upload-image', {
+            const response = await fetch(`${apiUrl}/upload-image`, {
                 method: 'POST',
                 body: formData,
             });
@@ -88,7 +89,7 @@ export function GameCard({ game, onLaunch, onToggleFavorite, simplifiedUI = fals
         if (!confirm('Are you sure you want to delete the custom image?')) return;
 
         try {
-            const response = await fetch('http://localhost:3001/delete-image', {
+            const response = await fetch(`${apiUrl}/delete-image`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',

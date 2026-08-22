@@ -356,6 +356,7 @@ export default function HomeScreen() {
               onLaunch={handleLaunch}
               onToggleFavorite={toggleFavorite}
               simplifiedUI={settings.simplifiedUI}
+              apiUrl={settings.apiUrl}
             />
           ))}
         </View>
