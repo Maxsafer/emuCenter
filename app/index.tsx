@@ -57,7 +57,7 @@ export default function HomeScreen() {
     scanGamesFromEmulator,
     removeGamesByEmulator,
     cleanupOrphanedGames,
-  } = useGames(settings.apiUrl);
+  } = useGames(settings.apiUrl, settings.preferredController);
 
   // Cleanup orphaned games whenever emulators change
   React.useEffect(() => {

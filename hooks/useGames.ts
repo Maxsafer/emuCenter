@@ -8,7 +8,7 @@ const GAMES_KEY = 'games';
 const RECENTS_KEY = 'recent_games';
 const MAX_RECENTS = 9;
 
-export function useGames(apiUrl: string) {
+export function useGames(apiUrl: string, preferredController: number = -1) {
     const [games, setGames] = useState<Game[]>([]);
     const [recents, setRecents] = useState<RecentGame[]>([]);
     const [loading, setLoading] = useState(true);
@@ -146,7 +146,7 @@ export function useGames(apiUrl: string) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ command: game.command }),
+                body: JSON.stringify({ command: game.command, preferredController }),
             });
 
             const data = await response.json();
@@ -170,7 +170,7 @@ export function useGames(apiUrl: string) {
                 error: error instanceof Error ? error.message : 'Unknown error'
             };
         }
-    }, [apiUrl, updateGame, updateRecents]);
+    }, [apiUrl, preferredController, updateGame, updateRecents]);
 
     const getRecentGames = useCallback(() => {
         return recents

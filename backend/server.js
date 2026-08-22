@@ -351,7 +351,7 @@ function executeCommand(command) {
  */
 app.post('/launch', async (req, res) => {
     try {
-        const { command } = req.body;
+        const { command, preferredController } = req.body;
 
         if (!command || typeof command !== 'string') {
             return res.status(400).json({
@@ -361,6 +361,19 @@ app.post('/launch', async (req, res) => {
         }
 
         const { mainCommand, scripts } = parseCommand(command);
+
+        // Template tokens in script values, ported from the original EmuCenter's
+        // command_cleaner: 'vcontroller' becomes the preferred controller index,
+        // 'emupath' the directory of the (quoted) emulator executable. The main
+        // command is left untouched, faithful to the original.
+        const vcontroller = String(Number.isInteger(preferredController) ? preferredController : -1);
+        const exeMatch = mainCommand.match(/^\s*"([^"]+)"/);
+        const emupath = exeMatch ? path.dirname(exeMatch[1]) : '';
+        for (const script of scripts) {
+            script.value = script.value
+                .replace(/vcontroller/g, vcontroller)
+                .replace(/emupath/g, emupath);
+        }
 
         // Execute pre-launch scripts
         for (const script of scripts.filter(s => s.type === 'pre')) {
