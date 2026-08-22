@@ -88,7 +88,7 @@ export function SettingsModal({
             });
             const result = await response.json();
             showIgdbStatus(result.success ? 'saved' : 'error');
-        } catch (e) {
+        } catch {
             showIgdbStatus('error');
         }
     };

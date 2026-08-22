@@ -240,7 +240,7 @@ export function AddEmulatorModal({ visible, onClose, onAdd, onScan, initialData 
                                     autoCapitalize="none"
                                 />
                                 <Text style={styles.hint}>
-                                    Use 'exepath' for emulator path, 'game' for game file
+                                    Use &lsquo;exepath&rsquo; for emulator path, &lsquo;game&rsquo; for game file
                                 </Text>
                             </View>
 
