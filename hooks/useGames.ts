@@ -1,7 +1,7 @@
 import { Game, LaunchResponse, RecentGame } from '@/types';
 import BackendStorage from '@/utils/backendStorage';
 import { cleanGameName } from '@/utils/gameNameCleaner';
-import { findBackgroundImage, getImagesDirectory } from '@/utils/imageMatching';
+import { findBackgroundImage } from '@/utils/imageMatching';
 import { useCallback, useEffect, useState } from 'react';
 
 const GAMES_KEY = 'games';
@@ -84,7 +84,7 @@ export function useGames(apiUrl: string) {
         command: string
     ) => {
         const cleanedName = cleanGameName(name);
-        const coverImage = await findBackgroundImage(name, getImagesDirectory(), apiUrl);
+        const coverImage = await findBackgroundImage(name, apiUrl);
 
         // Generate unique ID: timestamp + random number to prevent collisions during bulk operations
         const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -187,15 +187,13 @@ export function useGames(apiUrl: string) {
     }, [games]);
 
     const refreshGameImages = useCallback(async () => {
-        const imagesDir = getImagesDirectory();
-
         for (const game of games) {
-            const coverImage = await findBackgroundImage(game.name, imagesDir);
+            const coverImage = await findBackgroundImage(game.name, apiUrl);
             if (coverImage && coverImage !== game.coverImage) {
                 updateGame(game.id, { coverImage });
             }
         }
-    }, [games, updateGame]);
+    }, [games, updateGame, apiUrl]);
 
     const scanGamesFromEmulator = useCallback(async (emulator: import('@/types').Emulator) => {
         console.log(`[useGames] Starting game scan for emulator: ${emulator.displayName}`);
@@ -215,7 +213,7 @@ export function useGames(apiUrl: string) {
         // findBackgroundImage is async, so game objects (with images) are prepared
         // ahead of the functional state update that merges them against 'prev'.
         const potentialNewGames = await Promise.all(discoveredGames.map(async (d) => {
-            const coverImage = await findBackgroundImage(d.name, getImagesDirectory(), apiUrl);
+            const coverImage = await findBackgroundImage(d.name, apiUrl);
             return {
                 ...d,
                 cleanName: cleanGameName(d.name),
