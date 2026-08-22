@@ -47,104 +47,48 @@ export function useEmulators() {
         template: string,
         excludedExtensions: string[] = ['.bin', '.sav', '.txt', '.srm', '.DS_Store'],
         icon?: string
-    ) => {
-        let resultEmulator: Emulator;
+    ): Promise<Emulator> => {
+        // Generated outside the updater so StrictMode's double invocation
+        // produces identical objects for both the resolved value and the state.
+        const newId = Date.now().toString();
 
-        setEmulators(prev => {
-            const existingIndex = prev.findIndex(e => e.name === name);
-            if (existingIndex >= 0) {
-                // Update existing
-                const updated = [...prev];
-                const existing = updated[existingIndex];
-                const updatedEmulator = {
-                    ...existing,
-                    displayName,
-                    exePath,
-                    gamesPaths,
-                    gamesPath: gamesPaths[0], // Maintain legacy compat
-                    template,
-                    excludedExtensions,
-                    icon: icon || existing.icon,
-                };
-                updated[existingIndex] = updatedEmulator;
-                resultEmulator = updatedEmulator;
-                return updated;
-            } else {
-                // Add new
-                const newEmulator: Emulator = {
-                    id: Date.now().toString(),
-                    name,
-                    displayName,
-                    exePath,
-                    gamesPaths,
-                    gamesPath: gamesPaths[0], // Maintain legacy compat
-                    template,
-                    excludedExtensions,
-                    icon,
-                    createdAt: Date.now(),
-                };
-                resultEmulator = newEmulator;
-                return [...prev, newEmulator];
-            }
-        });
-
-        // Note: resultEmulator will be assigned synchronously inside the setEmulators updater 
-        // ONLY if React processes it immediately (which it does not always). 
-        // THIS IS UNSAFE IN REACT. 
-        // BETTER APPROACH: Return the object derived from inputs, assuming it will be applied.
-
-        // Re-deriving for safe return:
-        // We can't easily know if it was an update or create without reading 'emulators' state, 
-        // but 'emulators' in useCallback dependency might be stale if we don't include it.
-        // However, we want strict returning. 
-        // Let's rely on the fact that we are inside the hook.
-
-        // Actually, for the purpose of 'onAdd' which usually just needs the ID or to trigger a scan,
-        // we can construct the object.
-
-        // Let's change the pattern specific to this hook to make it cleaner:
-        // We will read the current 'emulators' ref if possible, but here we can just do:
-
-        // Wait, I can't look up 'emulators' inside the setEmulators callback and return it out.
-        // I have to do the check OUTSIDE setEmulators.
-
-        // But 'emulators' is a dependency.
         return new Promise<Emulator>((resolve) => {
             setEmulators(prev => {
                 const existingIndex = prev.findIndex(e => e.name === name);
-                let currentEmulator: Emulator;
 
                 if (existingIndex >= 0) {
+                    // Update existing
                     const existing = prev[existingIndex];
-                    currentEmulator = {
+                    const updatedEmulator: Emulator = {
                         ...existing,
                         displayName,
                         exePath,
                         gamesPaths,
-                        gamesPath: gamesPaths[0],
+                        gamesPath: gamesPaths[0], // Maintain legacy compat
                         template,
                         excludedExtensions,
                         icon: icon || existing.icon,
                     };
                     const updated = [...prev];
-                    updated[existingIndex] = currentEmulator;
-                    resolve(currentEmulator);
+                    updated[existingIndex] = updatedEmulator;
+                    resolve(updatedEmulator);
                     return updated;
                 } else {
-                    currentEmulator = {
-                        id: Date.now().toString(),
+                    // Add new
+                    const newEmulator: Emulator = {
+                        id: newId,
                         name,
                         displayName,
                         exePath,
                         gamesPaths,
-                        gamesPath: gamesPaths[0],
+                        gamesPath: gamesPaths[0], // Maintain legacy compat
                         template,
                         excludedExtensions,
                         icon,
                         createdAt: Date.now(),
                     };
-                    resolve(currentEmulator);
-                    return [...prev, currentEmulator];
+                    resolve(newEmulator);
+                    return [...prev, newEmulator];
                 }
             });
         });
