@@ -3,15 +3,27 @@
  */
 
 /**
+ * Known game-file extensions (kept in sync with the backend's list).
+ * Stripping is limited to these so version-like segments ("Game v1.2")
+ * and extensionless folder names survive intact.
+ */
+const GAME_EXTENSION_RE = /\.(iso|zip|7z|rar|gb|gba|gbc|nds|3ds|cia|wbfs|wad|rvz|gcm|gcz|ciso|cso|chd|bin|cue|img|mdf|ecm|nsp|xci|xex|zar|elf|pbp|z64|n64|v64|nes|sfc|smc|srl)$/i;
+
+/**
  * Clean a game name by removing:
- * - File extensions
+ * - Known file extensions (iteratively, so "track01.bin.ecm" fully unwraps)
  * - Region codes like (USA), (EUR), (Japan)
  * - Release info like [!], [a], [b]
  * - Extra whitespace
  */
 export function cleanGameName(rawName: string): string {
-    // Remove file extension
-    const withoutExt = rawName.replace(/\.[^/.]+$/, '');
+    // Strip known extensions until none remain
+    let withoutExt = rawName;
+    let prev;
+    do {
+        prev = withoutExt;
+        withoutExt = withoutExt.replace(GAME_EXTENSION_RE, '');
+    } while (withoutExt !== prev);
 
     // Remove content in parentheses and brackets
     const withoutCodes = withoutExt.replace(/\([^)]*\)|\[[^\]]*\]/g, '');

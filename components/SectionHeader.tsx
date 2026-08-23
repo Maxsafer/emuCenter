@@ -1,28 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 interface SectionHeaderProps {
     title: string;
     count?: number;
     icon?: keyof typeof Ionicons.glyphMap;
+    /** Emulator icon image URL - preferred over `icon` when it loads */
+    iconUri?: string;
     /** When provided, the header is pressable and shows a collapse chevron */
     onToggle?: () => void;
     collapsed?: boolean;
 }
 
-export function SectionHeader({ title, count, icon, onToggle, collapsed = false }: SectionHeaderProps) {
+export function SectionHeader({ title, count, icon, iconUri, onToggle, collapsed = false }: SectionHeaderProps) {
     const { width } = useWindowDimensions();
     const scale = Math.min(1.5, Math.max(1, width / 1200)); // Base scale on 1200px width
 
     const titleSize = 16 * scale; // Base 16
     const iconSize = 24 * scale;
     const countSize = 11 * scale;
+    const imageSize = 30 * scale;
+
+    const [imageFailed, setImageFailed] = React.useState(false);
+    React.useEffect(() => {
+        setImageFailed(false);
+    }, [iconUri]);
+
+    const showImage = !!iconUri && !imageFailed;
 
     return (
         <Pressable style={styles.container} onPress={onToggle} disabled={!onToggle}>
             <View style={styles.content}>
-                {icon && <Ionicons name={icon} size={iconSize} color="#60A5FA" style={styles.icon} />}
+                {showImage && (
+                    <Image
+                        source={{ uri: iconUri }}
+                        style={[styles.iconImage, { width: imageSize, height: imageSize }]}
+                        resizeMode="contain"
+                        onError={() => setImageFailed(true)}
+                    />
+                )}
+                {!showImage && icon && <Ionicons name={icon} size={iconSize} color="#60A5FA" style={styles.icon} />}
                 <Text style={[styles.title, { fontSize: titleSize }]}>{title}</Text>
                 {count !== undefined && (
                     <View style={styles.badge}>
@@ -61,6 +79,9 @@ const styles = StyleSheet.create({
     icon: {
         opacity: 0.9,
         // Size is controlled by props, make sure to update call site or default if needed
+    },
+    iconImage: {
+        opacity: 0.95,
     },
     chevron: {
         marginLeft: 4,

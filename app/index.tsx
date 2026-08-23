@@ -332,7 +332,9 @@ export default function HomeScreen() {
 
     if (settings.sortBy === 'alphabetical') {
       const grouped = filteredGames.reduce((acc, game) => {
-        const firstLetter = game.cleanName[0].toUpperCase();
+        // Guarded: an empty cleanName (all-bracket titles, dot-files) used
+        // to crash this on sort toggle - the "full white screen" bug
+        const firstLetter = game.cleanName[0]?.toUpperCase() || '#';
         if (!acc[firstLetter]) acc[firstLetter] = [];
         acc[firstLetter].push(game);
         return acc;
@@ -507,18 +509,30 @@ export default function HomeScreen() {
 
   React.useEffect(() => {
     if (!selectedId) return;
-    const node = cardNodes.current.get(selectedId) as { scrollIntoView?: (opts: object) => void } | undefined;
-    if (node && typeof node.scrollIntoView === 'function') {
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    } else if (selectedSectionIndex != null && scrollRef.current) {
-      // Virtualized-away card: jump by section, close enough to mount it
-      scrollRef.current.scrollToIndex({ index: selectedSectionIndex, viewPosition: 0.3 });
+    // Everything here is guarded: a re-sort can fire this with a stale
+    // section index, and an unhandled scrollToIndex throw white-screens
+    // the whole renderer.
+    try {
+      const node = cardNodes.current.get(selectedId) as { scrollIntoView?: (opts: object) => void } | undefined;
+      if (node && typeof node.scrollIntoView === 'function') {
+        node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } else if (selectedSectionIndex != null && scrollRef.current) {
+        // Virtualized-away card: jump by section, close enough to mount it
+        scrollRef.current.scrollToIndex({ index: selectedSectionIndex, viewPosition: 0.3 });
+      }
+    } catch (e) {
+      console.warn('[Nav] scroll-into-view failed:', e);
     }
   }, [selectedId, selectedSectionIndex]);
 
   const renderSection = ({ item }: { item: { title: string; data: typeof filteredGames } }) => {
-    // Determine icon based on sort mode
-    const icon = settings.sortBy === 'emulator' ? 'game-controller' : undefined;
+    // Determine icon based on sort mode; by-emulator sections get the real
+    // emulator icon (falls back to the generic glyph if none matches)
+    const byEmulator = settings.sortBy === 'emulator';
+    const icon = byEmulator ? 'game-controller' : undefined;
+    const iconUri = byEmulator
+      ? `${settings.apiUrl}/emulator-icon/${encodeURIComponent(item.title)}`
+      : undefined;
     const isCollapsed = collapsedTitles.has(item.title);
 
     return (
@@ -527,6 +541,7 @@ export default function HomeScreen() {
           title={item.title}
           count={item.data.length}
           icon={icon}
+          iconUri={iconUri}
           collapsed={isCollapsed}
           onToggle={() => toggleSection(item.title)}
         />
@@ -581,6 +596,7 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           initialNumToRender={5}
           windowSize={5}
+          onScrollToIndexFailed={() => { /* stale index after a re-sort - ignore */ }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="game-controller-outline" size={64} color="#334155" />

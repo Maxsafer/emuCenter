@@ -1,6 +1,8 @@
+import { detectEmulator } from '@/utils/emulatorCatalog';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -37,6 +39,14 @@ export function AddEmulatorModal({ visible, onClose, onAdd, onScan, initialData 
     const [gamesPaths, setGamesPaths] = useState<string[]>(['']); // Array of paths
     const [template, setTemplate] = useState('exepath game');
     const [excludedExt, setExcludedExt] = useState('.bin,.sav,.txt,.srm,.DS_Store');
+    const [iconVersion, setIconVersion] = useState(0);
+    const [iconError, setIconError] = useState(false);
+
+    // Prefill bookkeeping: an auto-suggested value may be replaced by the
+    // next suggestion, but anything the user typed themselves never is.
+    const lastSuggestedName = useRef<string | null>(null);
+    const lastSuggestedDisplayName = useRef<string | null>(null);
+    const lastSuggestedTemplate = useRef<string | null>(null);
 
     // Populate form when initialData changes (Edit Mode)
     React.useEffect(() => {
@@ -57,7 +67,85 @@ export function AddEmulatorModal({ visible, onClose, onAdd, onScan, initialData 
             setTemplate('exepath game');
             setExcludedExt('.bin,.sav,.txt,.srm,.DS_Store');
         }
+        lastSuggestedName.current = null;
+        lastSuggestedDisplayName.current = null;
+        lastSuggestedTemplate.current = null;
+        setIconVersion(0);
+        setIconError(false);
     }, [initialData, visible]);
+
+    const normalizedName = name.trim().toLowerCase().replace(/\s+/g, '-');
+
+    // Detect a known emulator from whatever is filled in so far and offer
+    // its proven launch template (and name/display name when untouched).
+    const detected = React.useMemo(
+        () => detectEmulator(`${name} ${displayName} ${exePath}`),
+        [name, displayName, exePath]
+    );
+
+    React.useEffect(() => {
+        if (!detected) return;
+
+        setName(prev => {
+            const untouched = !prev.trim() || prev === lastSuggestedName.current;
+            if (untouched && prev !== detected.key) {
+                lastSuggestedName.current = detected.key;
+                return detected.key;
+            }
+            return prev;
+        });
+        setDisplayName(prev => {
+            const untouched = !prev.trim() || prev === lastSuggestedDisplayName.current;
+            if (untouched && prev !== detected.displayName) {
+                lastSuggestedDisplayName.current = detected.displayName;
+                return detected.displayName;
+            }
+            return prev;
+        });
+        setTemplate(prev => {
+            const untouched = !prev.trim()
+                || prev.trim() === 'exepath game'
+                || prev === lastSuggestedTemplate.current;
+            if (untouched && prev !== detected.template) {
+                lastSuggestedTemplate.current = detected.template;
+                return detected.template;
+            }
+            return prev;
+        });
+        setIconError(false);
+    }, [detected]);
+
+    const iconQueryName = normalizedName || detected?.key || '';
+    const iconUri = iconQueryName
+        ? `${API_URL}/emulator-icon/${encodeURIComponent(iconQueryName)}${iconVersion ? `?v=${iconVersion}` : ''}`
+        : null;
+
+    const iconInputRef = useRef<HTMLInputElement>(null);
+
+    const handleIconUpload = async (event: any) => {
+        const file = event.target.files[0];
+        if (!file || !iconQueryName) return;
+
+        const formData = new FormData();
+        formData.append('emulatorName', iconQueryName);
+        formData.append('image', file);
+
+        try {
+            const response = await fetch(`${API_URL}/upload-emulator-icon`, {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await response.json();
+            if (data.success) {
+                setIconVersion(Date.now());
+                setIconError(false);
+            } else {
+                console.error('Icon upload failed:', data.error);
+            }
+        } catch (err) {
+            console.error('Icon upload error:', err);
+        }
+    };
 
     const handleBrowseFile = async () => {
         try {
@@ -171,6 +259,61 @@ export function AddEmulatorModal({ visible, onClose, onAdd, onScan, initialData 
                                     value={displayName}
                                     onChangeText={setDisplayName}
                                 />
+                            </View>
+
+                            {/* Icon + detection */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Icon</Text>
+                                <View style={styles.iconRow}>
+                                    <View style={styles.iconPreview}>
+                                        {iconUri && !iconError ? (
+                                            <Image
+                                                source={{ uri: iconUri }}
+                                                style={styles.iconImage}
+                                                resizeMode="contain"
+                                                onError={() => setIconError(true)}
+                                            />
+                                        ) : (
+                                            <Ionicons name="game-controller-outline" size={28} color="#475569" />
+                                        )}
+                                    </View>
+                                    <View style={styles.iconInfo}>
+                                        {detected ? (
+                                            <Text style={styles.detectedText}>
+                                                Detected: {detected.displayName}
+                                            </Text>
+                                        ) : (
+                                            <Text style={styles.hint}>
+                                                Known emulators are detected automatically
+                                            </Text>
+                                        )}
+                                        <Text style={styles.hint}>
+                                            {iconError ? 'No icon found — upload one below' : 'Auto-matched icon shown'}
+                                        </Text>
+                                    </View>
+                                    <Pressable
+                                        style={[styles.browseButton, !iconQueryName && styles.submitButtonDisabled]}
+                                        onPress={() => {
+                                            if (Platform.OS === 'web' && iconInputRef.current) {
+                                                iconInputRef.current.click();
+                                            }
+                                        }}
+                                        disabled={!iconQueryName}
+                                    >
+                                        <Ionicons name="image" size={20} color="#60A5FA" />
+                                    </Pressable>
+                                </View>
+                                {Platform.OS === 'web' && (
+                                    <div style={{ display: 'none' }}>
+                                        <input
+                                            type="file"
+                                            ref={iconInputRef}
+                                            accept="image/*"
+                                            onChange={handleIconUpload}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                )}
                             </View>
 
                             <View style={styles.inputGroup}>
@@ -391,5 +534,34 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    iconRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    iconPreview: {
+        width: 52,
+        height: 52,
+        borderRadius: 12,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    iconImage: {
+        width: 44,
+        height: 44,
+    },
+    iconInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    detectedText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#10B981',
     },
 });
