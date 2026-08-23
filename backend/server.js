@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { exec } = require('child_process');
+const multer = require('multer');
+const { exec, spawn } = require('child_process');
 const os = require('os');
 const fs = require('fs').promises;
 const path = require('path');
@@ -22,6 +23,9 @@ const IMAGES_DIR = (process.env.IS_ELECTRON && process.env.USER_DATA_PATH)
     : BUNDLED_IMAGES_DIR;
 
 async function ensureImagesDir() {
+    // Custom emulator-icon uploads need their directory in every mode
+    try { await fs.mkdir(CUSTOM_EMU_ICONS_DIR, { recursive: true }); } catch { /* exists */ }
+
     if (IMAGES_DIR === BUNDLED_IMAGES_DIR) return;
     await fs.mkdir(IMAGES_DIR, { recursive: true });
     try {
@@ -33,6 +37,64 @@ async function ensureImagesDir() {
     } catch (e) {
         console.warn('[Images] seed failed:', e.message);
     }
+}
+
+// Emulator icons: the 13 bundled ones migrated from the original EmuCenter,
+// plus user uploads (custom dir wins; writable in userData when packaged).
+const BUNDLED_EMU_ICONS_DIR = path.join(__dirname, 'emu-icons');
+const CUSTOM_EMU_ICONS_DIR = (process.env.IS_ELECTRON && process.env.USER_DATA_PATH)
+    ? path.join(process.env.USER_DATA_PATH, 'emu-icons')
+    : path.join(__dirname, 'emu-icons-custom');
+
+// Canonical emulator detection - shared idea with the frontend catalog:
+// map whatever the user typed/named to the bundled icon's base name.
+const EMU_CANONICAL_MATCHERS = [
+    ['visualboyadvance-m', /vba|visual\s*boy|visualboyadvance/i],
+    ['project64', /project\s*64|pj64/i],
+    ['duckstation', /duckstation/i],
+    ['pcsx2', /pcsx2/i],
+    ['rpcs3', /rpcs3/i],
+    ['ppsspp', /ppsspp/i],
+    ['dolphin', /dolphin/i],
+    ['desmume', /desmume/i],
+    ['citra', /citra/i],
+    ['yuzu', /yuzu/i],
+    ['eden', /eden/i],
+    ['xemu', /xemu/i],
+    ['xenia', /xenia/i],
+];
+
+const ICON_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
+
+function findIconFile(dir, baseName) {
+    let entries;
+    try {
+        entries = require('fs').readdirSync(dir);
+    } catch {
+        return null;
+    }
+    const lower = baseName.toLowerCase();
+    for (const f of entries) {
+        if (!ICON_EXTENSIONS.includes(path.extname(f).toLowerCase())) continue;
+        if (path.parse(f).name.toLowerCase() === lower) return path.join(dir, f);
+    }
+    return null;
+}
+
+function findEmulatorIcon(name) {
+    // 1. Custom upload under the emulator's own name always wins
+    const custom = findIconFile(CUSTOM_EMU_ICONS_DIR, name);
+    if (custom) return custom;
+
+    // 2. Canonical detection ("vba" -> visualboyadvance-m.png)
+    const match = EMU_CANONICAL_MATCHERS.find(([, re]) => re.test(name));
+    if (match) {
+        return findIconFile(CUSTOM_EMU_ICONS_DIR, match[0])
+            || findIconFile(BUNDLED_EMU_ICONS_DIR, match[0]);
+    }
+
+    // 3. Exact bundled name as a last resort
+    return findIconFile(BUNDLED_EMU_ICONS_DIR, name);
 }
 
 const pickFileScript = path.join(__dirname, 'scripts', 'PickFile.ps1');
@@ -321,6 +383,31 @@ function parseCommand(command) {
 }
 
 /**
+ * Launch the main game command detached with output ignored. exec() would
+ * buffer the child's stdout with a 1MB cap and KILL the process when it
+ * overflows - xenia logs enough at boot to hit that within seconds, which
+ * looked like "launches and then closes". The launcher has no business
+ * capturing emulator output anyway, and this also lets /launch respond as
+ * soon as the game starts instead of when it exits.
+ */
+function launchDetached(command) {
+    return new Promise((resolve, reject) => {
+        console.log(`Launching: ${command} `);
+        const child = spawn(command, [], {
+            shell: platform === 'win32' ? 'cmd.exe' : '/bin/sh',
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false,
+        });
+        child.once('error', reject);
+        child.once('spawn', () => {
+            child.unref();
+            resolve();
+        });
+    });
+}
+
+/**
  * Execute a command with proper platform handling
  */
 function executeCommand(command) {
@@ -415,8 +502,8 @@ app.post('/launch', async (req, res) => {
             }
         }
 
-        // Execute main command
-        await executeCommand(mainCommand);
+        // Execute main command (fire-and-forget; see launchDetached)
+        await launchDetached(mainCommand);
 
         // Execute post-launch scripts
         for (const script of scripts.filter(s => s.type === 'post')) {
@@ -488,25 +575,31 @@ app.post('/scan', async (req, res) => {
         const files = fs.readdirSync(gamesPath);
         console.log(`[Scan] Found ${files.length} items in directory`);
 
-        // Filter out excluded extensions and directories
+        // Filter out hidden entries and excluded extensions. Directories ARE
+        // included - PS3 titles and extracted games are folders, and the
+        // legacy version listed them (this is how rpcs3 games show up).
         const games = files.filter(file => {
             const fullPath = path.join(gamesPath, file);
 
-            // Skip directories
+            if (file.startsWith('.')) return false;
+
             try {
-                if (fs.statSync(fullPath).isDirectory()) {
-                    console.log(`[Scan] Skipping directory: ${file} `);
-                    return false;
-                }
+                fs.statSync(fullPath);
             } catch (e) {
                 console.warn(`[Scan] Error checking ${file}: `, e.message);
                 return false;
             }
 
-            // Skip excluded extensions
-            const isExcluded = excludedExtensions.some(ext =>
-                file.toLowerCase().endsWith(ext.toLowerCase())
-            );
+            // Exclusion matches the end of the name OR any dot-segment, so
+            // ".bin" also catches double extensions like "track01.bin.ecm"
+            // (the legacy behavior), and extensionless entries like
+            // "backups" can be excluded by name.
+            const lower = file.toLowerCase();
+            const segments = lower.split('.').slice(1).map(s => '.' + s);
+            const isExcluded = excludedExtensions.some(ext => {
+                const e = ext.toLowerCase();
+                return lower.endsWith(e) || segments.includes(e);
+            });
 
             if (isExcluded) {
                 console.log(`[Scan] Excluded: ${file} `);
@@ -539,11 +632,20 @@ app.post('/scan', async (req, res) => {
 
 /**
  * Clean game name - remove region codes, file extensions, etc.
+ * Known extensions are stripped iteratively so double extensions
+ * ("track01.bin.ecm") fully unwrap, while unknown dot-segments
+ * ("Game v1.2") survive untouched.
  */
+const GAME_EXTENSION_RE = /\.(iso|zip|7z|rar|gb|gba|gbc|nds|3ds|cia|wbfs|wad|rvz|gcm|gcz|ciso|cso|chd|bin|cue|img|mdf|ecm|nsp|xci|xex|zar|elf|pbp|z64|n64|v64|nes|sfc|smc|srl)$/i;
+
 function cleanGameName(name) {
     let cleaned = name;
-    // Remove file extension
-    cleaned = cleaned.replace(/\.(iso|zip|gb|gba|gbc|nds|3ds|cia|wbfs|wad|rvz|cso|chd|bin|cue|img|nsp|xci)$/i, '');
+    // Strip known extensions until none remain
+    let prev;
+    do {
+        prev = cleaned;
+        cleaned = cleaned.replace(GAME_EXTENSION_RE, '');
+    } while (cleaned !== prev);
     // Remove region codes in parentheses or brackets
     cleaned = cleaned.replace(/\s*[\[\(](USA|EUR|JAP|JPN|Europe|Japan|World|En|Fr|De|Es|It|Ko|Zh|Rev\s*\d*|v\d+(\.\d+)?|Disc\s*\d+)[\]\)]/gi, '');
     // Clean up multiple spaces
@@ -676,6 +778,50 @@ app.get('/health', (req, res) => {
         platform,
         timestamp: new Date().toISOString()
     });
+});
+
+/**
+ * GET /emulator-icon/:name
+ * Best-match icon for an emulator: custom upload > canonical match > exact.
+ */
+app.get('/emulator-icon/:name', (req, res) => {
+    const name = decodeURIComponent(req.params.name);
+    const file = findEmulatorIcon(name);
+    if (file) {
+        return res.sendFile(file);
+    }
+    res.status(404).json({ success: false, error: 'No icon found' });
+});
+
+/**
+ * POST /upload-emulator-icon
+ * Custom icon for an emulator (multipart: emulatorName + image).
+ */
+const emuIconStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, CUSTOM_EMU_ICONS_DIR);
+    },
+    filename: function (req, file, cb) {
+        const emulatorName = req.body.emulatorName;
+        if (!emulatorName) return cb(new Error('Emulator name is required'));
+        // Sanitized: the emulator name becomes the file base name
+        const safe = emulatorName.replace(/[^a-z0-9 _.-]/gi, '_').trim();
+        cb(null, `${safe}${path.extname(file.originalname).toLowerCase()}`);
+    }
+});
+const uploadEmuIcon = multer({ storage: emuIconStorage });
+
+app.post('/upload-emulator-icon', uploadEmuIcon.single('image'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No image file provided' });
+        }
+        console.log(`[EmuIcon] Custom icon uploaded for: ${req.body.emulatorName}`);
+        res.json({ success: true, filename: req.file.filename });
+    } catch (error) {
+        console.error('[EmuIcon] Upload error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 /**
@@ -828,8 +974,6 @@ app.post('/pick-directory', async (req, res) => {
 
 
 // Multer configuration for file uploads
-const multer = require('multer');
-
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, IMAGES_DIR);
