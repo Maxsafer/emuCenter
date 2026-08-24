@@ -14,14 +14,15 @@ I specifically made this for my need of having an emulator game hub for my Ayane
    - [Adding an emulator](#adding-an-emulator)
    - [Launch templates](#launch-templates)
    - [Cover art](#cover-art)
-3. [How to use](#-how-to-use)
+3. [Pictures](#-pictures)
+4. [How to use](#-how-to-use)
    - [Controller and keyboard bindings](#controller-and-keyboard-bindings)
    - [Virtual controller](#virtual-controller)
    - [Launching and closing games](#launching-and-closing-games)
-4. [Settings reference](#-settings-reference)
-5. [Tested emulators](#-tested-emulators)
-6. [Running from source](#-running-from-source)
-7. [Future development](#-future-development)
+5. [Settings reference](#-settings-reference)
+6. [Tested emulators](#-tested-emulators)
+7. [Running from source](#-running-from-source)
+8. [Future development](#-future-development)
 
 # !! Download-and-Install
 
@@ -86,6 +87,31 @@ Covers are automatic, in this order:
 1. **Local matching** — exact name, then normalized/franchise matching (a `pokemon.jpg` covers every Pokémon game without its own cover).
 2. **IGDB** — if you add free [IGDB/Twitch API credentials](https://api-docs.igdb.com/#getting-started) in Settings, missing covers are fetched automatically.
 3. **Manual upload** — hover a card and use the edit button to upload any image for that game.
+
+# !! Pictures
+This section is purely to showcase the app — everything below was captured from the packaged Windows build.
+
+### Game Library
+Sorted by emulator, info cards on (gold stars are favorites):
+![library](docs/screenshots/library.png)
+
+Sorted alphabetically:
+![alphabetical](docs/screenshots/alphabetical.png)
+
+### Controller navigation
+The selected game pops out with a breathing cyan highlight:
+![controller selection](docs/screenshots/controller-selection.png)
+
+Sections collapsed — emulator icons in the headers; `START` / `I` or the header button toggles all:
+![sections collapsed](docs/screenshots/sections-collapsed.png)
+
+### Adding an emulator
+Known emulators are detected as you type — icon, display name and a proven launch template are prefilled:
+![add emulator](docs/screenshots/add-emulator-detection.png)
+
+### Exit confirmation
+Console style — `A` confirms, `B` cancels:
+![exit dialog](docs/screenshots/exit-dialog.png)
 
 # !! How-to-use
 
