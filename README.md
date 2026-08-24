@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **This is the legacy Python/Qt version of EmuCenter.** The new generation — **EmuCenter v3**, rebuilt with a modern UI, automatic cover art, and proper installers for **Windows, macOS and Linux** — lives on the [`v3` branch](https://github.com/Maxsafer/emuCenter/tree/v3). Grab the installers from [Releases](https://github.com/Maxsafer/emuCenter/releases). This version remains available for anyone who prefers the original Python app.
+
 # Welcome to EmuCenter!
 <p align="center">
    <img src="https://github.com/Maxsafer/emuCenter/blob/b0445116bba8288f029d4bd41e0d4b3b2e284ffa/images/logo.png" alt="logo" width=50%/>
