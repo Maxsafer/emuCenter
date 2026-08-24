@@ -400,12 +400,19 @@ function parseCommand(command) {
  * looked like "launches and then closes". The launcher has no business
  * capturing emulator output anyway, and this also lets /launch respond as
  * soon as the game starts instead of when it exits.
+ *
+ * cwd must be a writable directory, ideally the emulator's own folder: a
+ * packaged build's backend inherits the install dir (C:\Program Files\
+ * EmuCenter) as cwd, where xenia canary fail-fasts (0xc0000409 in
+ * ucrtbase) seconds into boot because it cannot write relative to cwd.
+ * Portable emulators in general expect to run from their own directory.
  */
-function launchDetached(command) {
+function launchDetached(command, cwd) {
     return new Promise((resolve, reject) => {
-        console.log(`Launching: ${command} `);
+        console.log(`Launching: ${command} (cwd: ${cwd})`);
         const child = spawn(command, [], {
             shell: platform === 'win32' ? 'cmd.exe' : '/bin/sh',
+            cwd,
             detached: true,
             stdio: 'ignore',
             windowsHide: false,
@@ -513,8 +520,16 @@ app.post('/launch', async (req, res) => {
             }
         }
 
+        // Launch from the emulator's own directory (see launchDetached's
+        // comment on why cwd matters); fall back to the home dir, which is
+        // at least writable - never the read-only install dir we inherit.
+        let launchCwd = os.homedir();
+        if (emupath) {
+            try { await fs.access(emupath); launchCwd = emupath; } catch { /* fall back */ }
+        }
+
         // Execute main command (fire-and-forget; see launchDetached)
-        await launchDetached(mainCommand);
+        await launchDetached(mainCommand, launchCwd);
 
         // Execute post-launch scripts
         for (const script of scripts.filter(s => s.type === 'post')) {
