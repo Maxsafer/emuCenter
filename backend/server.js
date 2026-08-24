@@ -437,7 +437,7 @@ function describeLaunch(mainCommand) {
  * ucrtbase) seconds into boot because it cannot write relative to cwd.
  * Portable emulators in general expect to run from their own directory.
  */
-function launchDetached(command, cwd, splash) {
+function launchDetached(command, cwd) {
     return new Promise((resolve, reject) => {
         console.log(`Launching: ${command} (cwd: ${cwd})`);
         const child = spawn(command, [], {
@@ -455,10 +455,9 @@ function launchDetached(command, cwd, splash) {
             // emulator window opens BEHIND the fullscreen launcher unless
             // the launcher minimizes. cmd /c and /bin/sh -c both wait for
             // the emulator, so this child's exit tracks the game's exit.
-            // The splash metadata rides along for the launch popup.
             if (process.send) {
                 try {
-                    process.send({ type: 'game-started', ...(splash || {}) });
+                    process.send({ type: 'game-started' });
                     child.once('exit', () => {
                         try { process.send({ type: 'game-exited' }); } catch { /* shell gone */ }
                     });
@@ -520,6 +519,13 @@ app.post('/launch', async (req, res) => {
 
         const { mainCommand, scripts } = parseCommand(command);
 
+        // Announce the launch IMMEDIATELY - before pre-launch scripts and
+        // the spawn - so the shell's splash gives instant press-feedback.
+        // A later game-failed retracts it if anything below throws.
+        if (process.send) {
+            try { process.send({ type: 'game-launching', ...describeLaunch(mainCommand) }); } catch { /* shell gone */ }
+        }
+
         // Template tokens in script values, ported from the original EmuCenter's
         // command_cleaner: 'vcontroller' becomes the preferred controller index,
         // 'emupath' the directory of the (quoted) emulator executable. The main
@@ -574,7 +580,7 @@ app.post('/launch', async (req, res) => {
         }
 
         // Execute main command (fire-and-forget; see launchDetached)
-        await launchDetached(mainCommand, launchCwd, describeLaunch(mainCommand));
+        await launchDetached(mainCommand, launchCwd);
 
         // Execute post-launch scripts
         for (const script of scripts.filter(s => s.type === 'post')) {
@@ -594,6 +600,10 @@ app.post('/launch', async (req, res) => {
 
     } catch (error) {
         console.error('Launch error:', error);
+        // Retract the splash - the game never started
+        if (process.send) {
+            try { process.send({ type: 'game-failed' }); } catch { /* shell gone */ }
+        }
         res.status(500).json({
             success: false,
             error: error.message || 'Failed to launch application'
