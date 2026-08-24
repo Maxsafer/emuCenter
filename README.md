@@ -36,7 +36,7 @@ Grab the latest release for your platform from the [Releases](../../releases) pa
 
 **Optional — virtual controller (Windows only):** the *Virtual controller* feature (one stable controller that any physical pad drives, see [below](#virtual-controller)) requires the [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases) driver by [nefarius](https://github.com/nefarius). Everything else works without it — if the driver is missing, EmuCenter simply tells you so in Settings. On macOS and Linux this feature is unavailable (no ViGEmBus equivalent exists); the rest of the app works the same.
 
-**macOS note:** the app is not notarized (Apple charges for that), so the first launch needs a right-click → **Open** instead of a double-click.
+**macOS note:** the app is not notarized (Apple charges for that), so the first launch might need a right-click → **Open** instead of a double-click.
 
 Your library, settings and uploaded covers live in the app's data folder — `%APPDATA%\EmuCenter` (Windows), `~/Library/Application Support/EmuCenter` (macOS), `~/.config/emucenter` (Linux) — so reinstalling or updating never touches your setup.
 
