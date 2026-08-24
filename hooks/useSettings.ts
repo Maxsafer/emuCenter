@@ -1,6 +1,6 @@
 import { DEFAULT_API_URL, Settings } from '@/types';
 import BackendStorage from '@/utils/backendStorage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const SETTINGS_KEY = 'settings';
 
@@ -19,6 +19,9 @@ const DEFAULT_SETTINGS: Settings = {
 export function useSettings() {
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
     const [loading, setLoading] = useState(true);
+    // If the initial load never reached the backend, the on-disk config may
+    // hold data this session cannot see - saving would overwrite it.
+    const loadFailed = useRef(false);
 
     // Load settings on mount
     useEffect(() => {
@@ -30,7 +33,8 @@ export function useSettings() {
                     setSettings({ ...DEFAULT_SETTINGS, ...loaded });
                 }
             } catch (e) {
-                console.error('Failed to load settings', e);
+                loadFailed.current = true;
+                console.error('Failed to load settings; saving disabled to protect on-disk config', e);
             } finally {
                 setLoading(false);
             }
@@ -39,7 +43,7 @@ export function useSettings() {
 
     // Save settings whenever they change
     useEffect(() => {
-        if (loading) return;
+        if (loading || loadFailed.current) return;
 
         const saveSettings = async () => {
             try {

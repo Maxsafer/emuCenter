@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const { exec, spawn } = require('child_process');
+const { exec, spawn, execFileSync } = require('child_process');
 const os = require('os');
 const fs = require('fs').promises;
 const path = require('path');
@@ -187,21 +187,23 @@ async function getIGDBToken() {
 }
 
 /**
- * Search IGDB for a game and get its cover image URL
+ * Search IGDB for a game and get its cover image URL.
+ * Returns the cover URL, null when IGDB answered "no cover" (cacheable),
+ * or undefined when the lookup could not run at all (missing credentials,
+ * network/auth failure) - callers must NOT cache undefined, or a transient
+ * failure pins the game to "no cover" until restart.
  */
 async function getIGDBCover(gameName) {
     const config = await getIGDBConfig();
-    if (!config) return null;
+    if (!config) return undefined;
 
     const token = await getIGDBToken();
-    if (!token) return null;
+    if (!token) return undefined;
 
-    // Clean game name for search
-    let searchName = gameName
-        .replace(/\.(iso|zip|gb|gba|gbc|nds|3ds|cia|wbfs|wad|rvz|cso|chd|bin|cue|img|nsp|xci)$/i, '')
-        .replace(/\s*[\[\(](USA|EUR|JAP|JPN|Europe|Japan|World|En|Fr|De|Es|It|Ko|Zh|Rev\s*\d*|v\d+(\.\d+)?|Disc\s*\d+)[\]\)]/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    // cleanGameName knows the full extension list; a slimmer copy here once
+    // missed .ciso/.gcm/.7z etc., so searches went out as "Game.ciso" and
+    // IGDB found nothing while the same setup worked for .iso/.gba libraries.
+    const searchName = cleanGameName(gameName);
 
     console.log(`[IGDB] Searching for: "${searchName}"`);
 
@@ -219,7 +221,7 @@ async function getIGDBCover(gameName) {
 
         if (!searchResponse.ok) {
             console.error('[IGDB] Search failed:', searchResponse.status);
-            return null;
+            return undefined;
         }
 
         const games = await searchResponse.json();
@@ -244,7 +246,7 @@ async function getIGDBCover(gameName) {
 
         if (!coverResponse.ok) {
             console.error('[IGDB] Cover fetch failed:', coverResponse.status);
-            return null;
+            return undefined;
         }
 
         const covers = await coverResponse.json();
@@ -262,7 +264,7 @@ async function getIGDBCover(gameName) {
 
     } catch (error) {
         console.error('[IGDB] Error:', error.message);
-        return null;
+        return undefined;
     }
 }
 
@@ -323,6 +325,15 @@ app.post('/config/:key', async (req, res) => {
 
         const filePath = path.join(CONFIG_DIR, `${key}.json`);
         await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+
+        // New IGDB credentials must take effect immediately: drop the cached
+        // token and the negative cover-lookup results from earlier attempts,
+        // which otherwise pin every cover to 404 until the app restarts.
+        if (key === 'igdb') {
+            igdbAccessToken = null;
+            igdbTokenExpiry = 0;
+            igdbCache.clear();
+        }
 
         console.log(`[Config] Saved: ${key}`);
         res.json({ success: true });
@@ -750,8 +761,11 @@ app.get('/game-image/:gameName', async (req, res) => {
         // Fetch from IGDB
         const igdbUrl = await getIGDBCover(gameName);
 
-        // Cache the result (even if null)
-        igdbCache.set(cacheKey, igdbUrl);
+        // Cache hits and authoritative misses (null), never infrastructure
+        // failures (undefined) - those must retry on the next request.
+        if (igdbUrl !== undefined) {
+            igdbCache.set(cacheKey, igdbUrl);
+        }
 
         if (igdbUrl) {
             console.log(`[Image] IGDB found: ${igdbUrl}`);
@@ -869,6 +883,38 @@ async function runDialogCommand(command) {
 }
 
 /**
+ * macOS 'choose file' hands .app bundles over as directory paths, and
+ * /bin/sh exec of a directory dies instantly ("is a directory", exit 126)
+ * while the fire-and-forget launcher still reports success - a silent
+ * no-op launch. Resolve the bundle to its real executable instead.
+ */
+function resolveMacAppBundle(selectedPath) {
+    const trimmed = selectedPath.replace(/\/+$/, '');
+    if (!trimmed.toLowerCase().endsWith('.app')) return selectedPath;
+
+    let execName = null;
+    try {
+        // plutil ships with macOS and handles binary plists
+        const xml = execFileSync(
+            '/usr/bin/plutil',
+            ['-convert', 'xml1', '-o', '-', path.join(trimmed, 'Contents', 'Info.plist')],
+            { encoding: 'utf8' }
+        );
+        const match = xml.match(/<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/);
+        if (match) execName = match[1];
+    } catch { /* fall back to the bundle name */ }
+    if (!execName) execName = path.basename(trimmed, '.app');
+
+    const binPath = path.join(trimmed, 'Contents', 'MacOS', execName);
+    if (require('fs').existsSync(binPath)) {
+        console.log(`[Picker] Resolved app bundle to executable: ${binPath}`);
+        return binPath;
+    }
+    console.warn(`[Picker] Could not resolve executable inside ${trimmed}; keeping bundle path`);
+    return selectedPath;
+}
+
+/**
  * POST /pick-file
  * Open native file picker dialog
  */
@@ -883,6 +929,9 @@ app.post('/pick-file', async (req, res) => {
                 POSIX path of selectedFile
             `;
             selectedPath = await runDialogCommand(`osascript -e '${script}'`);
+            if (selectedPath) {
+                selectedPath = resolveMacAppBundle(selectedPath);
+            }
 
         } else if (platform === 'win32') {
             // Windows - Use PowerShell script

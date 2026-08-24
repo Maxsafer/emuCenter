@@ -1,12 +1,15 @@
 import { Emulator } from '@/types';
 import BackendStorage from '@/utils/backendStorage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const EMULATORS_KEY = 'emulators';
 
 export function useEmulators() {
     const [emulators, setEmulators] = useState<Emulator[]>([]);
     const [loading, setLoading] = useState(true);
+    // If the initial load never reached the backend, the on-disk config may
+    // hold data this session cannot see - saving would overwrite it.
+    const loadFailed = useRef(false);
 
     // Load emulators on mount
     useEffect(() => {
@@ -17,7 +20,8 @@ export function useEmulators() {
                     setEmulators(JSON.parse(emulatorsJson));
                 }
             } catch (e) {
-                console.error('Failed to load emulators', e);
+                loadFailed.current = true;
+                console.error('Failed to load emulators; saving disabled to protect on-disk config', e);
             } finally {
                 setLoading(false);
             }
@@ -26,7 +30,7 @@ export function useEmulators() {
 
     // Save emulators whenever they change
     useEffect(() => {
-        if (loading) return;
+        if (loading || loadFailed.current) return;
 
         const saveEmulators = async () => {
             try {

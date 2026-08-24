@@ -7,23 +7,39 @@ import { DEFAULT_API_URL } from '@/types';
 
 const API_URL = DEFAULT_API_URL;
 
+// The Electron shell forks the backend and loads the window at the same
+// time, so the first getItem calls can race a backend that is not listening
+// yet. Returning null on that failure is indistinguishable from "no saved
+// data": the hooks would come up empty and their save-on-change effects
+// would then overwrite the real config on disk. Retry while the backend
+// boots, and if it never answers, THROW so callers can tell "unreachable"
+// apart from "empty" and disable saving for the session.
+const GET_RETRIES = 30;
+const GET_RETRY_DELAY_MS = 500;
+
 export const BackendStorage = {
     /**
      * Get an item from backend storage
      */
     async getItem(key: string): Promise<string | null> {
-        try {
-            const response = await fetch(`${API_URL}/config/${encodeURIComponent(key)}`);
-            const result = await response.json();
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const response = await fetch(`${API_URL}/config/${encodeURIComponent(key)}`);
+                const result = await response.json();
 
-            if (result.success && result.data !== null) {
-                // Return as string (like AsyncStorage)
-                return JSON.stringify(result.data);
+                if (result.success && result.data !== null) {
+                    // Return as string (like AsyncStorage)
+                    return JSON.stringify(result.data);
+                }
+                // The backend answered: there really is no saved data.
+                return null;
+            } catch (error) {
+                if (attempt >= GET_RETRIES) {
+                    console.error(`[BackendStorage] backend unreachable, giving up on ${key}:`, error);
+                    throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, GET_RETRY_DELAY_MS));
             }
-            return null;
-        } catch (error) {
-            console.error(`[BackendStorage] getItem error for ${key}:`, error);
-            return null;
         }
     },
 

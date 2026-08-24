@@ -2,7 +2,7 @@ import { Game, LaunchResponse, RecentGame } from '@/types';
 import BackendStorage from '@/utils/backendStorage';
 import { cleanGameName } from '@/utils/gameNameCleaner';
 import { findBackgroundImage } from '@/utils/imageMatching';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const GAMES_KEY = 'games';
 const RECENTS_KEY = 'recent_games';
@@ -12,6 +12,9 @@ export function useGames(apiUrl: string, preferredController: number = -1) {
     const [games, setGames] = useState<Game[]>([]);
     const [recents, setRecents] = useState<RecentGame[]>([]);
     const [loading, setLoading] = useState(true);
+    // If the initial load never reached the backend, the on-disk config may
+    // hold data this session cannot see - saving would overwrite it.
+    const loadFailed = useRef(false);
 
     // Load games and recents on mount
     useEffect(() => {
@@ -29,7 +32,8 @@ export function useGames(apiUrl: string, preferredController: number = -1) {
                     setRecents(JSON.parse(recentsJson));
                 }
             } catch (e) {
-                console.error('Failed to load games', e);
+                loadFailed.current = true;
+                console.error('Failed to load games; saving disabled to protect on-disk config', e);
             } finally {
                 setLoading(false);
             }
@@ -38,7 +42,7 @@ export function useGames(apiUrl: string, preferredController: number = -1) {
 
     // Save games whenever they change
     useEffect(() => {
-        if (loading) return;
+        if (loading || loadFailed.current) return;
 
         const saveGames = async () => {
             try {
@@ -53,7 +57,7 @@ export function useGames(apiUrl: string, preferredController: number = -1) {
 
     // Save recents whenever they change
     useEffect(() => {
-        if (loading) return;
+        if (loading || loadFailed.current) return;
 
         const saveRecents = async () => {
             try {
