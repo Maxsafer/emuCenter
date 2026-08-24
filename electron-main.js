@@ -153,6 +153,44 @@ function showLaunchSplash(msg) {
     splashCloseTimer = setTimeout(hideLaunchSplash, 4000);
 }
 
+/**
+ * Take the foreground even when Windows says no. Emulators often destroy
+ * their window seconds before their process exits (in-game quit, save
+ * flush) - the shell hands the foreground to some other app in that gap,
+ * and by the time our exit event fires, SetForegroundWindow from a
+ * background process is denied by design: the launcher restores but sits
+ * unfocused, useless to a controller (the Gamepad API needs page focus).
+ * The classic workaround: a helper attaches its input queue to the
+ * current foreground thread, which makes its SetForegroundWindow call
+ * privileged. Fire-and-forget; a failed helper just means alt-tab.
+ */
+function forceForeground() {
+    if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return;
+    const hwnd = mainWindow.getNativeWindowHandle().readUInt32LE(0);
+    const cs = 'using System; using System.Runtime.InteropServices;' +
+        'public class FF {' +
+        '[DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();' +
+        '[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);' +
+        '[DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();' +
+        '[DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool att);' +
+        '[DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);' +
+        '[DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);' +
+        '[DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);' +
+        'public static void Force(IntPtr t) {' +
+        'IntPtr fg = GetForegroundWindow(); uint d; uint fgT = GetWindowThreadProcessId(fg, out d);' +
+        'uint myT = GetCurrentThreadId(); bool att = fg != IntPtr.Zero && fgT != myT;' +
+        'if (att) AttachThreadInput(myT, fgT, true);' +
+        'ShowWindow(t, 9); BringWindowToTop(t); SetForegroundWindow(t);' +
+        'if (att) AttachThreadInput(myT, fgT, false); } }';
+    const ps = `Add-Type -TypeDefinition '${cs}'; [FF]::Force([IntPtr]${hwnd})`;
+    const enc = Buffer.from(ps, 'utf16le').toString('base64');
+    const { spawn } = require('child_process');
+    spawn('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', enc],
+        { stdio: 'ignore', windowsHide: true }
+    ).on('error', () => { /* no powershell - alt-tab it is */ });
+}
+
 function startBackend() {
     // Spawn the existing server.js as a child process
     const backendPath = path.join(__dirname, 'backend/server.js');
@@ -204,10 +242,18 @@ function startBackend() {
             if (runningGames === 0) {
                 hideLaunchSplash(); // instant crashes shouldn't strand it
                 if (minimizeTimer) { clearTimeout(minimizeTimer); minimizeTimer = null; }
-                if (mainWindow.isMinimized()) {
-                    mainWindow.restore();
-                    mainWindow.focus();
-                }
+                // The game owned the screen; the launcher takes it back.
+                // show() also covers the window sitting merely behind
+                // other windows rather than minimized. If the polite
+                // focus() was denied (see forceForeground), escalate.
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+                setTimeout(() => {
+                    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+                        forceForeground();
+                    }
+                }, 300);
             }
         }
     });

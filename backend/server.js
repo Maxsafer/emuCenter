@@ -394,6 +394,38 @@ function parseCommand(command) {
 }
 
 /**
+ * A short, subtle rumble on every connected physical pad as tactile
+ * press-feedback when a launch lands - the splash's haptic twin.
+ * Windows-only (XInput). The virtual pad's own slot is skipped so the
+ * pulse is not fed back through the aggregator. Fire-and-forget: the
+ * launch must never wait on it.
+ */
+async function rumbleLaunchFeedback() {
+    if (platform !== 'win32') return;
+    try {
+        const xinput = await import('xinput-ffi');
+        const slots = [];
+        for (let i = 0; i < 4; i++) {
+            if (virtualPad.running && i === virtualPad.slot) continue;
+            try {
+                await xinput.getState({ dwUserIndex: i, translate: false });
+                slots.push(i);
+            } catch { /* not connected */ }
+        }
+        if (!slots.length) return;
+        console.log(`[Launch] Rumble feedback on pads: ${slots.join(', ')}`);
+        const buzz = (low, high) => Promise.all(slots.map(i =>
+            xinput.setState(low, high, { dwUserIndex: i, usePercent: true }).catch(() => { /* pad left */ })));
+        await buzz(35, 25);
+        await new Promise(r => setTimeout(r, 160));
+        await buzz(0, 0);
+    } catch { /* xinput-ffi absent (non-Windows build) - no haptics */ }
+}
+
+// Debounced: one launch per human intent (see /launch)
+let lastLaunchAt = 0;
+
+/**
  * Splash metadata for the shell's launch popup (the modern take on the
  * original EmuCenter's "Game starting, please be patient." dialog): game
  * title from the last quoted path in the command (the game), emulator
@@ -459,6 +491,7 @@ function launchDetached(command, cwd) {
                 try {
                     process.send({ type: 'game-started' });
                     child.once('exit', () => {
+                        console.log('[Launch] Game process exited');
                         try { process.send({ type: 'game-exited' }); } catch { /* shell gone */ }
                     });
                 } catch { /* shell gone */ }
@@ -519,12 +552,26 @@ app.post('/launch', async (req, res) => {
 
         const { mainCommand, scripts } = parseCommand(command);
 
+        // One launch per human intent: the virtual pad echoes physical
+        // input one frame later and double A-presses happen easily on a
+        // handheld, which used to spawn a SECOND emulator instance. That
+        // hidden instance then kept the shell's running-games count above
+        // zero, so the launcher stayed minimized after the real game
+        // closed. Anything inside 1.5s is the same press.
+        const nowMs = Date.now();
+        if (nowMs - lastLaunchAt < 1500) {
+            console.log('[Launch] Duplicate launch ignored (debounce)');
+            return res.json({ success: true, message: 'Duplicate launch ignored' });
+        }
+        lastLaunchAt = nowMs;
+
         // Announce the launch IMMEDIATELY - before pre-launch scripts and
         // the spawn - so the shell's splash gives instant press-feedback.
         // A later game-failed retracts it if anything below throws.
         if (process.send) {
             try { process.send({ type: 'game-launching', ...describeLaunch(mainCommand) }); } catch { /* shell gone */ }
         }
+        rumbleLaunchFeedback();
 
         // Template tokens in script values, ported from the original EmuCenter's
         // command_cleaner: 'vcontroller' becomes the preferred controller index,
