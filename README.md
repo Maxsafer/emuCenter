@@ -37,7 +37,7 @@ Grab the latest release for your platform from the [Releases](../../releases) pa
 
 **macOS note:** the app is not notarized (Apple charges for that), so the first launch needs a right-click → **Open** instead of a double-click.
 
-Your library, settings and uploaded covers live in `%APPDATA%\EmuCenter`, so reinstalling or updating never touches your setup.
+Your library, settings and uploaded covers live in the app's data folder — `%APPDATA%\EmuCenter` (Windows), `~/Library/Application Support/EmuCenter` (macOS), `~/.config/emucenter` (Linux) — so reinstalling or updating never touches your setup.
 
 # !! Setting-up-EmuCenter
 
@@ -53,6 +53,10 @@ Everything is configured inside the UI — there are no configuration files to e
 6. Save — EmuCenter scans the folders and your games appear immediately.
 
 Use **Settings → Manage Emulators** to edit, rescan or remove an emulator later, and **Settings → Sync All** to rescan everything at once.
+
+> **Linux + flatpak/snap emulators:** the executable to pick is the exported wrapper (e.g. `/var/lib/flatpak/exports/bin/org.DolphinEmu.dolphin-emu`), and the emulator's sandbox must be allowed to see your ROM folders or launches fail with "file does not exist":
+> `flatpak override --user org.DolphinEmu.dolphin-emu --filesystem=/path/to/roms:ro`
+> Native and AppImage emulators need none of this.
 
 ## Launch templates
 
