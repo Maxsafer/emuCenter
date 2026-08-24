@@ -62,18 +62,38 @@ ipcMain.handle('fullscreen:get', () => (mainWindow ? mainWindow.isFullScreen() :
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('window:quit', () => { app.quit(); }); // will-quit kills the backend
 
+// Rolling diagnostic log for the launch choreography (userData/launcher.log)
+function llog(line) {
+    try {
+        const logFile = path.join(app.getPath('userData'), 'launcher.log');
+        try { if (fs.statSync(logFile).size > 262144) fs.unlinkSync(logFile); } catch { /* absent */ }
+        fs.appendFileSync(logFile, `${new Date().toISOString()} ${line}\n`);
+    } catch { /* logging must never break the launcher */ }
+}
+
 /**
- * Take the foreground even when Windows says no. Emulators often destroy
- * their window seconds before their process exits (in-game quit, save
- * flush) - the shell hands the foreground to some other app in that gap,
- * and by the time our exit event fires, SetForegroundWindow from a
- * background process is denied by design: the launcher restores but sits
- * unfocused, useless to a controller (the Gamepad API needs page focus).
- * The classic workaround: a helper attaches its input queue to the
- * current foreground thread, which makes its SetForegroundWindow call
- * privileged. Fire-and-forget; a failed helper just means alt-tab.
+ * Bring the launched game's window to the front once it exists.
+ *
+ * The launcher deliberately does NOT minimize (an earlier design did,
+ * and any lost exit event left it stranded in the taskbar). Instead it
+ * stays fullscreen underneath, and this helper walks the launched
+ * process tree until a real visible window appears, then forces it to
+ * the foreground - allowed because the helper is spawned by the current
+ * foreground process, with the AttachThreadInput trick as belt and
+ * braces. When the game window later closes, Windows activates the next
+ * window in z-order, which is the launcher: no restore logic, no
+ * counters, nothing that can get stuck. Console windows are skipped so
+ * a chatty emulator's log console is not promoted over its render
+ * window. Gives up silently after ~20s (game failed to open a window).
  */
-function forceForeground() {
+/**
+ * Bring the launcher itself back to the foreground. Used after the last
+ * game exits when Windows' own hand-back did not land on us (some other
+ * window was raised mid-game) - on a controller there is no practical
+ * alt-tab. Same AttachThreadInput trick as bringGameForward; the
+ * ShowWindow(9) also un-minimizes if the user had minimized us manually.
+ */
+function forceSelfForeground() {
     if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return;
     const hwnd = mainWindow.getNativeWindowHandle().readUInt32LE(0);
     const cs = 'using System; using System.Runtime.InteropServices;' +
@@ -100,6 +120,56 @@ function forceForeground() {
     ).on('error', () => { /* no powershell - alt-tab it is */ });
 }
 
+function bringGameForward(rootPid) {
+    if (process.platform !== 'win32') return;
+    const cs = 'using System; using System.Runtime.InteropServices; using System.Text;' +
+        'public class FW {' +
+        'delegate bool EnumProc(IntPtr h, IntPtr l);' +
+        '[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);' +
+        '[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);' +
+        '[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);' +
+        '[DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr h);' +
+        '[DllImport("user32.dll", CharSet=CharSet.Auto)] static extern int GetClassName(IntPtr h, StringBuilder sb, int max);' +
+        '[DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();' +
+        '[DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();' +
+        '[DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool att);' +
+        '[DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);' +
+        '[DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);' +
+        'public static IntPtr FindWindowOfPids(int[] pids) {' +
+        'IntPtr found = IntPtr.Zero;' +
+        'EnumWindows((h, l) => {' +
+        'if (!IsWindowVisible(h) || GetWindowTextLength(h) == 0) return true;' +
+        'uint p; GetWindowThreadProcessId(h, out p);' +
+        'bool mine = false; foreach (int x in pids) if ((uint)x == p) mine = true;' +
+        'if (!mine) return true;' +
+        'var sb = new StringBuilder(64); GetClassName(h, sb, 64);' +
+        'if (sb.ToString() == "ConsoleWindowClass") return true;' +
+        'found = h; return false; }, IntPtr.Zero);' +
+        'return found; }' +
+        'public static void Force(IntPtr t) {' +
+        'IntPtr fg = GetForegroundWindow(); uint d; uint fgT = GetWindowThreadProcessId(fg, out d);' +
+        'uint myT = GetCurrentThreadId(); bool att = fg != IntPtr.Zero && fgT != myT;' +
+        'if (att) AttachThreadInput(myT, fgT, true);' +
+        'BringWindowToTop(t); SetForegroundWindow(t);' +
+        'if (att) AttachThreadInput(myT, fgT, false); } }';
+    const ps =
+        `$root = ${Number(rootPid)}; ` +
+        `Add-Type -TypeDefinition '${cs}'; ` +
+        'for ($i = 0; $i -lt 40; $i++) { ' +
+        '$set = @([int]$root); ' +
+        '$all = Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId; ' +
+        'do { $n = @($all | Where-Object { $set -contains [int]$_.ParentProcessId -and $set -notcontains [int]$_.ProcessId } | ForEach-Object { [int]$_.ProcessId }); $set += $n } while ($n.Count -gt 0); ' +
+        '$h = [FW]::FindWindowOfPids([int[]]$set); ' +
+        'if ($h -ne [IntPtr]::Zero) { [FW]::Force($h); exit 0 }; ' +
+        'Start-Sleep -Milliseconds 500 }';
+    const enc = Buffer.from(ps, 'utf16le').toString('base64');
+    const { spawn } = require('child_process');
+    spawn('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', enc],
+        { stdio: 'ignore', windowsHide: true }
+    ).on('error', () => { /* no powershell - game opens behind, alt-tab */ });
+}
+
 function startBackend() {
     // Spawn the existing server.js as a child process
     const backendPath = path.join(__dirname, 'backend/server.js');
@@ -114,47 +184,28 @@ function startBackend() {
 
     // A launched game should own the screen. The backend has no foreground
     // rights (it is a background process), so on Windows its children open
-    // BEHIND the fullscreen launcher. Minimize while games run and restore
-    // when the last one exits - on a controller-only handheld there is no
-    // practical alt-tab, so the restore half is as important as the
-    // minimize half. Skipped on macOS, where minimizing a fullscreen
-    // window fights the Spaces model.
-    let runningGames = 0;
-    let minimizeTimer = null;
+    // BEHIND the fullscreen launcher. The launcher stays where it is and
+    // bringGameForward promotes the game's window once it exists; when
+    // that window later closes, Windows activates the launcher again on
+    // its own. Deliberately no minimize/restore choreography - see the
+    // bringGameForward comment.
     backendProcess.on('message', (msg) => {
         if (!msg || !mainWindow || mainWindow.isDestroyed()) return;
         if (msg.type === 'game-started') {
-            runningGames++;
-            // Give the emulator a moment to create its window BEFORE
-            // minimizing: when the foreground launcher minimizes, Windows
-            // activates the topmost remaining window, which by then is the
-            // game. Minimizing at spawn time is too early - no game window
-            // exists yet, focus falls to some other app, and the game then
-            // opens behind it (verified live with xenia).
-            if (process.platform !== 'darwin' && !minimizeTimer) {
-                minimizeTimer = setTimeout(() => {
-                    minimizeTimer = null;
-                    if (runningGames > 0 && mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.minimize();
-                    }
-                }, 2500);
-            }
+            llog(`game-started pid=${msg.pid} running=${msg.remaining}`);
+            if (msg.pid) bringGameForward(msg.pid);
         } else if (msg.type === 'game-exited') {
-            runningGames = Math.max(0, runningGames - 1);
-            if (runningGames === 0) {
-                if (minimizeTimer) { clearTimeout(minimizeTimer); minimizeTimer = null; }
-                // The game owned the screen; the launcher takes it back.
-                // show() also covers the window sitting merely behind
-                // other windows rather than minimized. If the polite
-                // focus() was denied (see forceForeground), escalate.
-                if (mainWindow.isMinimized()) mainWindow.restore();
-                mainWindow.show();
-                mainWindow.focus();
+            llog(`game-exited running=${msg.remaining}`);
+            // Windows normally hands the screen straight back (the
+            // launcher sits right under the game). If another window won
+            // the z-order instead, take the foreground back.
+            if (msg.remaining === 0) {
                 setTimeout(() => {
                     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
-                        forceForeground();
+                        llog('not focused after last game exit - forcing foreground');
+                        forceSelfForeground();
                     }
-                }, 300);
+                }, 500);
             }
         }
     });

@@ -425,6 +425,11 @@ async function rumbleLaunchFeedback() {
 // Debounced: one launch per human intent (see /launch)
 let lastLaunchAt = 0;
 
+// Live launch children - the authoritative "is a game still running"
+// answer. IPC events can in principle be lost and counters can drift;
+// this set cannot: entries leave only when the process really exits.
+const liveChildren = new Set();
+
 /**
  * Launch the main game command detached with output ignored. exec() would
  * buffer the child's stdout with a 1MB cap and KILL the process when it
@@ -457,14 +462,18 @@ function launchDetached(command, cwd) {
             // emulator window opens BEHIND the fullscreen launcher unless
             // the launcher minimizes. cmd /c and /bin/sh -c both wait for
             // the emulator, so this child's exit tracks the game's exit.
+            // `remaining` carries the authoritative live count; the shell
+            // also polls /launch-status as a backstop for lost events.
+            liveChildren.add(child);
+            child.once('exit', () => {
+                liveChildren.delete(child);
+                console.log(`[Launch] Game process exited (${liveChildren.size} still running)`);
+                if (process.send) {
+                    try { process.send({ type: 'game-exited', remaining: liveChildren.size }); } catch { /* shell gone */ }
+                }
+            });
             if (process.send) {
-                try {
-                    process.send({ type: 'game-started' });
-                    child.once('exit', () => {
-                        console.log('[Launch] Game process exited');
-                        try { process.send({ type: 'game-exited' }); } catch { /* shell gone */ }
-                    });
-                } catch { /* shell gone */ }
+                try { process.send({ type: 'game-started', remaining: liveChildren.size, pid: child.pid }); } catch { /* shell gone */ }
             }
             child.unref();
             resolve();
@@ -618,6 +627,16 @@ app.post('/launch', async (req, res) => {
             error: error.message || 'Failed to launch application'
         });
     }
+});
+
+/**
+ * GET /launch-status
+ * How many launched games are still actually running. The shell polls
+ * this while it sits minimized for a game, as a self-healing backstop
+ * against lost exit events (zero live games = time to come back).
+ */
+app.get('/launch-status', (req, res) => {
+    res.json({ running: liveChildren.size });
 });
 
 /**
