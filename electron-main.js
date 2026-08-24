@@ -62,97 +62,6 @@ ipcMain.handle('fullscreen:get', () => (mainWindow ? mainWindow.isFullScreen() :
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('window:quit', () => { app.quit(); }); // will-quit kills the backend
 
-// Launch splash: a small always-on-top card with the emulator's logo and
-// the game's title, shown while the game boots - the modern take on the
-// original EmuCenter's "Game starting, please be patient." dialog. It is
-// deliberately focusable:false and shown inactive so it can never receive
-// the foreground: when the main window minimizes, Windows must hand
-// activation to the GAME, not to this splash.
-//
-// The window is created ONCE at boot and kept hidden between launches:
-// its whole purpose is instant press-feedback, and creating a
-// BrowserWindow (a fresh renderer process) on demand costs the better
-// part of a second on the handheld - showing a warm hidden window costs
-// nothing. Content is swapped per launch via executeJavaScript.
-let splashWindow = null;
-let splashCloseTimer = null;
-
-const SPLASH_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
-    html,body{margin:0;height:100%;background:transparent;overflow:hidden;
-        font-family:'Segoe UI',Arial,sans-serif;-webkit-user-select:none;cursor:default}
-    .card{box-sizing:border-box;height:100%;display:flex;flex-direction:column;align-items:center;
-        justify-content:center;gap:14px;background:#1E293B;border:1px solid rgba(255,255,255,0.1);
-        border-radius:20px;padding:24px 32px}
-    img{width:84px;height:84px;object-fit:contain}
-    .title{color:#F8FAFC;font-size:20px;font-weight:700;text-align:center;max-width:100%;
-        overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .sub{color:#94A3B8;font-size:13px}
-    .spinner{width:22px;height:22px;border:3px solid rgba(56,189,248,0.25);
-        border-top-color:#38BDF8;border-radius:50%;animation:spin .9s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-</style></head><body><div class="card">
-    <img id="icon" alt="" style="display:none">
-    <div class="title" id="title"></div>
-    <div class="sub" id="sub"></div>
-    <div class="spinner"></div>
-</div>
-<script>
-window.setSplash = function (title, emulator, iconSrc) {
-    document.getElementById('title').textContent = title;
-    document.getElementById('sub').textContent =
-        emulator && emulator !== title ? 'Launching with ' + emulator + '\\u2026' : 'Launching\\u2026';
-    var img = document.getElementById('icon');
-    if (iconSrc) { img.src = iconSrc; img.style.display = ''; }
-    else { img.style.display = 'none'; }
-};
-</script></body></html>`;
-
-function createSplashWindow() {
-    splashWindow = new BrowserWindow({
-        width: 460,
-        height: 270,
-        frame: false,
-        transparent: true,
-        resizable: false,
-        movable: false,
-        alwaysOnTop: true,
-        skipTaskbar: true,
-        focusable: false,
-        show: false,
-        webPreferences: { sandbox: true },
-    });
-    splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(SPLASH_HTML));
-}
-
-function hideLaunchSplash() {
-    if (splashCloseTimer) { clearTimeout(splashCloseTimer); splashCloseTimer = null; }
-    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.hide();
-}
-
-function showLaunchSplash(msg) {
-    if (splashCloseTimer) { clearTimeout(splashCloseTimer); splashCloseTimer = null; }
-    if (!splashWindow || splashWindow.isDestroyed()) createSplashWindow();
-
-    let iconSrc = '';
-    try {
-        if (msg.iconPath) {
-            const ext = path.extname(msg.iconPath).slice(1).toLowerCase();
-            iconSrc = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,`
-                + fs.readFileSync(msg.iconPath).toString('base64');
-        }
-    } catch { /* icon unreadable - text-only splash */ }
-
-    const win = splashWindow;
-    const js = `setSplash(${JSON.stringify(msg.title || '')}, ${JSON.stringify(msg.emulator || '')}, ${JSON.stringify(iconSrc)})`;
-    const show = () => { if (win === splashWindow && win && !win.isDestroyed()) win.showInactive(); };
-    // Set content BEFORE showing so a re-show never flashes the previous
-    // game's card; on the warm renderer this round-trip is a few ms.
-    win.webContents.executeJavaScript(js).then(show, show);
-    // Outlive the minimize (2.5s) a little so it bridges the handoff to
-    // the game's window, like the original's 2s auto-close dialog.
-    splashCloseTimer = setTimeout(hideLaunchSplash, 4000);
-}
-
 /**
  * Take the foreground even when Windows says no. Emulators often destroy
  * their window seconds before their process exits (in-game quit, save
@@ -214,14 +123,7 @@ function startBackend() {
     let minimizeTimer = null;
     backendProcess.on('message', (msg) => {
         if (!msg || !mainWindow || mainWindow.isDestroyed()) return;
-        if (msg.type === 'game-launching') {
-            // Sent at the very top of /launch, before pre-launch scripts
-            // and the spawn itself: the splash is press-feedback, so it
-            // must appear the instant the click lands.
-            showLaunchSplash(msg);
-        } else if (msg.type === 'game-failed') {
-            hideLaunchSplash();
-        } else if (msg.type === 'game-started') {
+        if (msg.type === 'game-started') {
             runningGames++;
             // Give the emulator a moment to create its window BEFORE
             // minimizing: when the foreground launcher minimizes, Windows
@@ -240,7 +142,6 @@ function startBackend() {
         } else if (msg.type === 'game-exited') {
             runningGames = Math.max(0, runningGames - 1);
             if (runningGames === 0) {
-                hideLaunchSplash(); // instant crashes shouldn't strand it
                 if (minimizeTimer) { clearTimeout(minimizeTimer); minimizeTimer = null; }
                 // The game owned the screen; the launcher takes it back.
                 // show() also covers the window sitting merely behind
@@ -262,7 +163,6 @@ function startBackend() {
 app.whenReady().then(() => {
     startBackend();
     createWindow();
-    createSplashWindow(); // pre-warmed so a launch can show it instantly
 });
 
 // Cleanup when app closes

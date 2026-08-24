@@ -426,36 +426,6 @@ async function rumbleLaunchFeedback() {
 let lastLaunchAt = 0;
 
 /**
- * Splash metadata for the shell's launch popup (the modern take on the
- * original EmuCenter's "Game starting, please be patient." dialog): game
- * title from the last quoted path in the command (the game), emulator
- * identity from the first (the exe), enriched from the saved emulator
- * config when the exe path matches an entry.
- */
-function describeLaunch(mainCommand) {
-    const quoted = [...mainCommand.matchAll(/"([^"]+)"/g)].map(m => m[1]);
-    const exePath = quoted[0] || '';
-    const gamePath = quoted.length > 1 ? quoted[quoted.length - 1] : '';
-    let emuName = exePath ? path.parse(exePath).name : '';
-    let emuDisplayName = emuName;
-    try {
-        const raw = require('fs').readFileSync(path.join(CONFIG_DIR, 'emulators.json'), 'utf8');
-        const emus = JSON.parse(raw);
-        const match = Array.isArray(emus) && emus.find(e => e && e.exePath && exePath
-            && e.exePath.toLowerCase() === exePath.toLowerCase());
-        if (match) {
-            emuName = match.name || emuName;
-            emuDisplayName = match.displayName || match.name || emuDisplayName;
-        }
-    } catch { /* no config yet - fall back to the exe's name */ }
-    return {
-        title: gamePath ? cleanGameName(path.basename(gamePath)) : emuDisplayName,
-        emulator: emuDisplayName,
-        iconPath: emuName ? findEmulatorIcon(emuName) : null,
-    };
-}
-
-/**
  * Launch the main game command detached with output ignored. exec() would
  * buffer the child's stdout with a 1MB cap and KILL the process when it
  * overflows - xenia logs enough at boot to hit that within seconds, which
@@ -565,12 +535,8 @@ app.post('/launch', async (req, res) => {
         }
         lastLaunchAt = nowMs;
 
-        // Announce the launch IMMEDIATELY - before pre-launch scripts and
-        // the spawn - so the shell's splash gives instant press-feedback.
-        // A later game-failed retracts it if anything below throws.
-        if (process.send) {
-            try { process.send({ type: 'game-launching', ...describeLaunch(mainCommand) }); } catch { /* shell gone */ }
-        }
+        // Tactile press-feedback right away (the card spinner is the
+        // visual half, drawn by the frontend on the pressed card)
         rumbleLaunchFeedback();
 
         // Template tokens in script values, ported from the original EmuCenter's
@@ -647,10 +613,6 @@ app.post('/launch', async (req, res) => {
 
     } catch (error) {
         console.error('Launch error:', error);
-        // Retract the splash - the game never started
-        if (process.send) {
-            try { process.send({ type: 'game-failed' }); } catch { /* shell gone */ }
-        }
         res.status(500).json({
             success: false,
             error: error.message || 'Failed to launch application'

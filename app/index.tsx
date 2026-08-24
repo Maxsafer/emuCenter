@@ -97,6 +97,12 @@ export default function HomeScreen() {
 
   const [editingEmulator, setEditingEmulator] = useState<any | null>(null);
 
+  // The pressed card shows a spinner in its title row: instant feedback
+  // that the launch registered. Cleared after a few seconds (the window
+  // minimizes while the game runs) or immediately on failure.
+  const [launchingGameId, setLaunchingGameId] = useState<string | null>(null);
+  const launchSpinnerTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const HEADER_HEIGHT = 60 + insets.top; // Approximate height including padding
   const headerTranslateY = useSharedValue(0);
   const lastScrollY = useSharedValue(0);
@@ -185,11 +191,16 @@ export default function HomeScreen() {
   const handleLaunch = async (game: Game) => {
     if (isDragging.current) return;
 
+    if (launchSpinnerTimer.current) clearTimeout(launchSpinnerTimer.current);
+    setLaunchingGameId(game.id);
+
     const result = await launchGame(game);
     if (!result.success) {
       console.error('Launch failed:', result.error);
+      setLaunchingGameId(null);
     } else {
       console.log('Game launched successfully');
+      launchSpinnerTimer.current = setTimeout(() => setLaunchingGameId(null), 4000);
     }
   };
 
@@ -556,6 +567,7 @@ export default function HomeScreen() {
               apiUrl={settings.apiUrl}
               selected={inputMode === 'controller' && game.id === selectedId}
               showInfo={settings.showInfoCards}
+              isLaunching={game.id === launchingGameId}
               registerRef={registerCardRef}
             />
           ))}
@@ -585,6 +597,7 @@ export default function HomeScreen() {
           scrollEventThrottle={16}
           data={sections}
           renderItem={renderSection}
+          extraData={launchingGameId}
           keyExtractor={(item) => item.title}
           contentContainerStyle={[
             styles.listContent,

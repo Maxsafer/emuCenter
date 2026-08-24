@@ -3,7 +3,7 @@ import { getGameImageUrl } from '@/utils/imageMatching';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useRef, useState } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
     cancelAnimation,
     Easing,
@@ -27,6 +27,8 @@ interface GameCardProps {
     selected?: boolean;
     /** Title + emulator badge overlays (the original's "info cards") */
     showInfo?: boolean;
+    /** This card's game is being launched - spinner in the title row */
+    isLaunching?: boolean;
     /** Lets the grid scroll the selected card into view (web DOM node) */
     registerRef?: (id: string, node: unknown) => void;
 }
@@ -39,6 +41,7 @@ export const GameCard = React.memo(function GameCard({
     apiUrl = DEFAULT_API_URL,
     selected = false,
     showInfo = true,
+    isLaunching = false,
     registerRef,
 }: GameCardProps) {
     const [isHovered, setIsHovered] = useState(false);
@@ -294,17 +297,28 @@ export const GameCard = React.memo(function GameCard({
                     )}
 
                     {/* Bottom: Game Title. Hidden with the info toggle, except
-                        on cover-less cards, which would become unidentifiable. */}
-                    {(showInfo || !showImage) && <View style={styles.titleContainer} pointerEvents="none">
-                        <Text
-                            style={[
-                                styles.gameTitle,
-                                { fontSize: dynamicTitleSize, lineHeight: dynamicLineHeight }
-                            ]}
-                            numberOfLines={2}
-                        >
-                            {game.cleanName.toLowerCase().replace(/(?:^|[\s\-\_\.])\w/g, (match) => match.toUpperCase())}
-                        </Text>
+                        on cover-less cards, which would become unidentifiable,
+                        and while launching, when the title row hosts the
+                        press-feedback spinner. */}
+                    {(showInfo || !showImage || isLaunching) && <View style={styles.titleContainer} pointerEvents="none">
+                        <View style={styles.titleRow}>
+                            {isLaunching && (
+                                <ActivityIndicator
+                                    size="small"
+                                    color="#00FAFF"
+                                    style={styles.launchSpinner}
+                                />
+                            )}
+                            <Text
+                                style={[
+                                    styles.gameTitle,
+                                    { fontSize: dynamicTitleSize, lineHeight: dynamicLineHeight }
+                                ]}
+                                numberOfLines={2}
+                            >
+                                {game.cleanName.toLowerCase().replace(/(?:^|[\s\-\_\.])\w/g, (match) => match.toUpperCase())}
+                            </Text>
+                        </View>
                         {game.playCount > 0 && (
                             <Text style={[styles.playCount, { fontSize: dynamicSubTextSize }]}>
                                 {game.playCount} play{game.playCount !== 1 ? 's' : ''}
@@ -428,7 +442,15 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    launchSpinner: {
+        marginRight: 8,
+    },
     gameTitle: {
+        flexShrink: 1, // Wraps/ellipsizes inside the spinner row
         fontSize: 10,
         fontWeight: '700',
         color: '#F8FAFC',
