@@ -62,6 +62,81 @@ ipcMain.handle('fullscreen:get', () => (mainWindow ? mainWindow.isFullScreen() :
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('window:quit', () => { app.quit(); }); // will-quit kills the backend
 
+// Launch splash: a small always-on-top card with the emulator's logo and
+// the game's title, shown while the game boots - the modern take on the
+// original EmuCenter's "Game starting, please be patient." dialog. It is
+// deliberately focusable:false and shown inactive so it can never receive
+// the foreground: when the main window minimizes, Windows must hand
+// activation to the GAME, not to this splash.
+let splashWindow = null;
+let splashCloseTimer = null;
+
+function closeLaunchSplash() {
+    if (splashCloseTimer) { clearTimeout(splashCloseTimer); splashCloseTimer = null; }
+    if (splashWindow) {
+        try { if (!splashWindow.isDestroyed()) splashWindow.close(); } catch { /* already gone */ }
+        splashWindow = null;
+    }
+}
+
+function showLaunchSplash(msg) {
+    closeLaunchSplash();
+
+    let iconSrc = '';
+    try {
+        if (msg.iconPath) {
+            const ext = path.extname(msg.iconPath).slice(1).toLowerCase();
+            iconSrc = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,`
+                + fs.readFileSync(msg.iconPath).toString('base64');
+        }
+    } catch { /* icon unreadable - text-only splash */ }
+
+    const esc = (s) => String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const title = esc(msg.title);
+    const emulator = esc(msg.emulator);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+        html,body{margin:0;height:100%;background:transparent;overflow:hidden;
+            font-family:'Segoe UI',Arial,sans-serif;-webkit-user-select:none;cursor:default}
+        .card{box-sizing:border-box;height:100%;display:flex;flex-direction:column;align-items:center;
+            justify-content:center;gap:14px;background:#1E293B;border:1px solid rgba(255,255,255,0.1);
+            border-radius:20px;padding:24px 32px}
+        img{width:84px;height:84px;object-fit:contain}
+        .title{color:#F8FAFC;font-size:20px;font-weight:700;text-align:center;max-width:100%;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .sub{color:#94A3B8;font-size:13px}
+        .spinner{width:22px;height:22px;border:3px solid rgba(56,189,248,0.25);
+            border-top-color:#38BDF8;border-radius:50%;animation:spin .9s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+    </style></head><body><div class="card">
+        ${iconSrc ? `<img src="${iconSrc}" alt="">` : ''}
+        <div class="title">${title}</div>
+        ${emulator && emulator !== title ? `<div class="sub">Launching with ${emulator}…</div>` : '<div class="sub">Launching…</div>'}
+        <div class="spinner"></div>
+    </div></body></html>`;
+
+    splashWindow = new BrowserWindow({
+        width: 460,
+        height: iconSrc ? 270 : 180,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        movable: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        focusable: false,
+        show: false,
+        webPreferences: { sandbox: true },
+    });
+    splashWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    splashWindow.once('ready-to-show', () => {
+        if (splashWindow && !splashWindow.isDestroyed()) splashWindow.showInactive();
+    });
+    // Outlive the minimize (2.5s) a little so it bridges the handoff to
+    // the game's window, like the original's 2s auto-close dialog.
+    splashCloseTimer = setTimeout(closeLaunchSplash, 4000);
+}
+
 function startBackend() {
     // Spawn the existing server.js as a child process
     const backendPath = path.join(__dirname, 'backend/server.js');
@@ -87,6 +162,7 @@ function startBackend() {
         if (!msg || !mainWindow || mainWindow.isDestroyed()) return;
         if (msg.type === 'game-started') {
             runningGames++;
+            showLaunchSplash(msg);
             // Give the emulator a moment to create its window BEFORE
             // minimizing: when the foreground launcher minimizes, Windows
             // activates the topmost remaining window, which by then is the
@@ -104,6 +180,7 @@ function startBackend() {
         } else if (msg.type === 'game-exited') {
             runningGames = Math.max(0, runningGames - 1);
             if (runningGames === 0) {
+                closeLaunchSplash(); // instant crashes shouldn't strand it
                 if (minimizeTimer) { clearTimeout(minimizeTimer); minimizeTimer = null; }
                 if (mainWindow.isMinimized()) {
                     mainWindow.restore();

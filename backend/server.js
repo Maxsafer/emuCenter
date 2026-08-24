@@ -394,6 +394,36 @@ function parseCommand(command) {
 }
 
 /**
+ * Splash metadata for the shell's launch popup (the modern take on the
+ * original EmuCenter's "Game starting, please be patient." dialog): game
+ * title from the last quoted path in the command (the game), emulator
+ * identity from the first (the exe), enriched from the saved emulator
+ * config when the exe path matches an entry.
+ */
+function describeLaunch(mainCommand) {
+    const quoted = [...mainCommand.matchAll(/"([^"]+)"/g)].map(m => m[1]);
+    const exePath = quoted[0] || '';
+    const gamePath = quoted.length > 1 ? quoted[quoted.length - 1] : '';
+    let emuName = exePath ? path.parse(exePath).name : '';
+    let emuDisplayName = emuName;
+    try {
+        const raw = require('fs').readFileSync(path.join(CONFIG_DIR, 'emulators.json'), 'utf8');
+        const emus = JSON.parse(raw);
+        const match = Array.isArray(emus) && emus.find(e => e && e.exePath && exePath
+            && e.exePath.toLowerCase() === exePath.toLowerCase());
+        if (match) {
+            emuName = match.name || emuName;
+            emuDisplayName = match.displayName || match.name || emuDisplayName;
+        }
+    } catch { /* no config yet - fall back to the exe's name */ }
+    return {
+        title: gamePath ? cleanGameName(path.basename(gamePath)) : emuDisplayName,
+        emulator: emuDisplayName,
+        iconPath: emuName ? findEmulatorIcon(emuName) : null,
+    };
+}
+
+/**
  * Launch the main game command detached with output ignored. exec() would
  * buffer the child's stdout with a 1MB cap and KILL the process when it
  * overflows - xenia logs enough at boot to hit that within seconds, which
@@ -407,7 +437,7 @@ function parseCommand(command) {
  * ucrtbase) seconds into boot because it cannot write relative to cwd.
  * Portable emulators in general expect to run from their own directory.
  */
-function launchDetached(command, cwd) {
+function launchDetached(command, cwd, splash) {
     return new Promise((resolve, reject) => {
         console.log(`Launching: ${command} (cwd: ${cwd})`);
         const child = spawn(command, [], {
@@ -425,9 +455,10 @@ function launchDetached(command, cwd) {
             // emulator window opens BEHIND the fullscreen launcher unless
             // the launcher minimizes. cmd /c and /bin/sh -c both wait for
             // the emulator, so this child's exit tracks the game's exit.
+            // The splash metadata rides along for the launch popup.
             if (process.send) {
                 try {
-                    process.send({ type: 'game-started' });
+                    process.send({ type: 'game-started', ...(splash || {}) });
                     child.once('exit', () => {
                         try { process.send({ type: 'game-exited' }); } catch { /* shell gone */ }
                     });
@@ -543,7 +574,7 @@ app.post('/launch', async (req, res) => {
         }
 
         // Execute main command (fire-and-forget; see launchDetached)
-        await launchDetached(mainCommand, launchCwd);
+        await launchDetached(mainCommand, launchCwd, describeLaunch(mainCommand));
 
         // Execute post-launch scripts
         for (const script of scripts.filter(s => s.type === 'post')) {
