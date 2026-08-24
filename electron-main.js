@@ -73,6 +73,45 @@ function startBackend() {
             USER_DATA_PATH: app.getPath('userData')
         }
     });
+
+    // A launched game should own the screen. The backend has no foreground
+    // rights (it is a background process), so on Windows its children open
+    // BEHIND the fullscreen launcher. Minimize while games run and restore
+    // when the last one exits - on a controller-only handheld there is no
+    // practical alt-tab, so the restore half is as important as the
+    // minimize half. Skipped on macOS, where minimizing a fullscreen
+    // window fights the Spaces model.
+    let runningGames = 0;
+    let minimizeTimer = null;
+    backendProcess.on('message', (msg) => {
+        if (!msg || !mainWindow || mainWindow.isDestroyed()) return;
+        if (msg.type === 'game-started') {
+            runningGames++;
+            // Give the emulator a moment to create its window BEFORE
+            // minimizing: when the foreground launcher minimizes, Windows
+            // activates the topmost remaining window, which by then is the
+            // game. Minimizing at spawn time is too early - no game window
+            // exists yet, focus falls to some other app, and the game then
+            // opens behind it (verified live with xenia).
+            if (process.platform !== 'darwin' && !minimizeTimer) {
+                minimizeTimer = setTimeout(() => {
+                    minimizeTimer = null;
+                    if (runningGames > 0 && mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.minimize();
+                    }
+                }, 2500);
+            }
+        } else if (msg.type === 'game-exited') {
+            runningGames = Math.max(0, runningGames - 1);
+            if (runningGames === 0) {
+                if (minimizeTimer) { clearTimeout(minimizeTimer); minimizeTimer = null; }
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore();
+                    mainWindow.focus();
+                }
+            }
+        }
+    });
 }
 
 app.whenReady().then(() => {

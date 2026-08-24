@@ -419,6 +419,20 @@ function launchDetached(command, cwd) {
         });
         child.once('error', reject);
         child.once('spawn', () => {
+            // Tell the Electron shell (fork IPC) that a game is running so
+            // it can get out of the way: the backend is a background
+            // process with no foreground rights on Windows, so the
+            // emulator window opens BEHIND the fullscreen launcher unless
+            // the launcher minimizes. cmd /c and /bin/sh -c both wait for
+            // the emulator, so this child's exit tracks the game's exit.
+            if (process.send) {
+                try {
+                    process.send({ type: 'game-started' });
+                    child.once('exit', () => {
+                        try { process.send({ type: 'game-exited' }); } catch { /* shell gone */ }
+                    });
+                } catch { /* shell gone */ }
+            }
             child.unref();
             resolve();
         });
