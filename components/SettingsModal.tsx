@@ -407,7 +407,7 @@ export function SettingsModal({
                         <Text style={styles.sectionTitle}>About</Text>
                         <View style={styles.aboutBox}>
                             <Text style={styles.aboutTitle}>EmuCenter</Text>
-                            <Text style={styles.aboutVersion}>Version 2.1.0</Text>
+                            <Text style={styles.aboutVersion}>Version 3.0.0</Text>
                             <Text style={styles.aboutDescription}>
                                 A comprehensive game and emulator launcher
                             </Text>
