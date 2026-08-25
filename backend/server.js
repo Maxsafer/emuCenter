@@ -193,6 +193,54 @@ async function getIGDBToken() {
  * network/auth failure) - callers must NOT cache undefined, or a transient
  * failure pins the game to "no cover" until restart.
  */
+/**
+ * IGDB allows ~4 requests/second per client id. The library-sized cover
+ * burst at app boot was answered with 429s for everything, so all IGDB
+ * lookups go through one lane with a spacing delay. Together with the
+ * on-disk cover cache and the persistent negative cache, traffic drops
+ * to zero once the library has been seen.
+ */
+let igdbLane = Promise.resolve();
+function queueIGDB(task) {
+    const run = igdbLane.then(task, task);
+    const pause = () => new Promise(resolve => setTimeout(resolve, 400));
+    igdbLane = run.then(pause, pause);
+    return run;
+}
+
+/**
+ * Persistent negative cover cache (CONFIG_DIR/covers-negative.json):
+ * "IGDB has nothing for this file" answers survive restarts, so a
+ * library full of unmatched homebrew/rips does not re-hammer IGDB on
+ * every boot. Entries expire after 30 days; deleting a game's image
+ * clears its entry, and saving new IGDB credentials clears them all.
+ * Only authoritative misses land here - rate limits and network
+ * failures (undefined) are never persisted.
+ */
+const NEGATIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+let negativeCovers = null;
+function loadNegativeCovers() {
+    if (negativeCovers) return negativeCovers;
+    negativeCovers = new Map();
+    try {
+        const raw = require('fs').readFileSync(path.join(CONFIG_DIR, 'covers-negative.json'), 'utf8');
+        for (const [k, v] of Object.entries(JSON.parse(raw))) negativeCovers.set(k, v);
+    } catch { /* first run */ }
+    return negativeCovers;
+}
+async function saveNegativeCovers() {
+    try {
+        await ensureConfigDir();
+        await fs.writeFile(
+            path.join(CONFIG_DIR, 'covers-negative.json'),
+            JSON.stringify(Object.fromEntries(loadNegativeCovers()), null, 2),
+            'utf8'
+        );
+    } catch (e) {
+        console.warn('[Image] negative-cache save failed:', e.message);
+    }
+}
+
 async function getIGDBCover(gameName) {
     const config = await getIGDBConfig();
     if (!config) return undefined;
@@ -333,6 +381,9 @@ app.post('/config/:key', async (req, res) => {
             igdbAccessToken = null;
             igdbTokenExpiry = 0;
             igdbCache.clear();
+            // New credentials should retry everything, persisted misses included
+            loadNegativeCovers().clear();
+            saveNegativeCovers();
         }
 
         console.log(`[Config] Saved: ${key}`);
@@ -763,6 +814,45 @@ function cleanGameName(name) {
 }
 
 /**
+ * Handhelds spend half their lives offline: an IGDB cover is downloaded
+ * into IMAGES_DIR the first time it is found, named exactly like a
+ * custom cover (cleanGameName + .jpg), so every later request hits the
+ * local exact-match step with no network involved at all. Cover art
+ * effectively never changes; the refresh path is the card's delete
+ * button, which removes the file and lets the next view re-query IGDB.
+ * If the download itself fails (offline mid-first-fetch), fall back to
+ * redirecting to the IGDB CDN like before, with the placeholder
+ * gradient as the final fallback.
+ */
+function safeImageBaseName(name) {
+    // Windows-forbidden filename characters; game names come from real
+    // files so this is almost always the identity
+    return name.replace(/[<>:"/\\|?*]/g, '-').trim();
+}
+
+async function downloadCoverToImages(url, cleanedName) {
+    const base = safeImageBaseName(cleanedName);
+    if (!base) return null;
+    const dest = path.join(IMAGES_DIR, `${base}.jpg`);
+    const tmp = `${dest}.download`;
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const buf = Buffer.from(await resp.arrayBuffer());
+        if (!buf.length) return null;
+        // Write-then-rename so a torn download can never be served
+        await fs.writeFile(tmp, buf);
+        await fs.rename(tmp, dest);
+        console.log(`[Image] Cached IGDB cover locally: ${path.basename(dest)} (${buf.length} bytes)`);
+        return path.basename(dest);
+    } catch (e) {
+        try { require('fs').unlinkSync(tmp); } catch { /* nothing partial left */ }
+        console.log(`[Image] Cover download failed (${e.message}) - serving remote URL`);
+        return null;
+    }
+}
+
+/**
  * GET /game-image/:gameName
  * Find best matching image for a game name (case-insensitive, smart matching)
  */
@@ -786,13 +876,17 @@ app.get('/game-image/:gameName', async (req, res) => {
             imageExtensions.some(ext => f.toLowerCase().endsWith(ext))
         );
 
-        // 1. Exact match (case-insensitive)
+        // 1. Exact match (case-insensitive) - both the raw clean name and
+        // the sanitized form that cached IGDB downloads are saved under
+        const exactBases = [...new Set([cleanedName, safeImageBaseName(cleanedName)])];
         for (const ext of imageExtensions) {
-            const candidate = `${cleanedName}${ext}`.toLowerCase();
-            for (const img of images) {
-                if (img.toLowerCase() === candidate) {
-                    console.log(`[Image] Exact match: ${img} for ${gameName}`);
-                    return res.redirect(`/images/${encodeURIComponent(img)}`);
+            for (const base of exactBases) {
+                const candidate = `${base}${ext}`.toLowerCase();
+                for (const img of images) {
+                    if (img.toLowerCase() === candidate) {
+                        console.log(`[Image] Exact match: ${img} for ${gameName}`);
+                        return res.redirect(`/images/${encodeURIComponent(img)}`);
+                    }
                 }
             }
         }
@@ -849,6 +943,11 @@ app.get('/game-image/:gameName', async (req, res) => {
             const cachedUrl = igdbCache.get(cacheKey);
             if (cachedUrl) {
                 console.log(`[Image] IGDB cache hit: ${cachedUrl}`);
+                // A memory hit means the earlier download attempt failed
+                // (otherwise the local exact match would have won) - retry
+                // pinning it to disk, then fall back to the remote URL
+                const saved = await downloadCoverToImages(cachedUrl, cleanedName);
+                if (saved) return res.redirect(`/images/${encodeURIComponent(saved)}`);
                 return res.redirect(cachedUrl);
             } else {
                 // Cached as "not found"
@@ -856,17 +955,31 @@ app.get('/game-image/:gameName', async (req, res) => {
             }
         }
 
-        // Fetch from IGDB
-        const igdbUrl = await getIGDBCover(gameName);
+        // Persistent negative cache: known misses skip IGDB entirely
+        const negAt = loadNegativeCovers().get(cacheKey);
+        if (negAt && Date.now() - negAt < NEGATIVE_TTL_MS) {
+            return res.status(404).json({ success: false, error: 'No matching image found' });
+        }
+
+        // Fetch from IGDB (throttled - see queueIGDB)
+        const igdbUrl = await queueIGDB(() => getIGDBCover(gameName));
 
         // Cache hits and authoritative misses (null), never infrastructure
         // failures (undefined) - those must retry on the next request.
         if (igdbUrl !== undefined) {
             igdbCache.set(cacheKey, igdbUrl);
+            if (igdbUrl === null) {
+                loadNegativeCovers().set(cacheKey, Date.now());
+                saveNegativeCovers();
+            } else {
+                loadNegativeCovers().delete(cacheKey);
+            }
         }
 
         if (igdbUrl) {
             console.log(`[Image] IGDB found: ${igdbUrl}`);
+            const saved = await downloadCoverToImages(igdbUrl, cleanedName);
+            if (saved) return res.redirect(`/images/${encodeURIComponent(saved)}`);
             return res.redirect(igdbUrl);
         }
 
@@ -1198,9 +1311,11 @@ app.delete('/delete-image', async (req, res) => {
             }
         }
 
-        // Clear cache
+        // Clear caches so the next view re-queries IGDB fresh - this is
+        // the per-game "refresh cover" path
         const cacheKey = cleanedName.toLowerCase();
         igdbCache.delete(cacheKey);
+        if (loadNegativeCovers().delete(cacheKey)) saveNegativeCovers();
 
         if (deleted) {
             res.json({ success: true, message: 'Image deleted successfully' });
