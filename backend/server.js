@@ -591,7 +591,9 @@ app.post('/launch', async (req, res) => {
         const nowMs = Date.now();
         if (nowMs - lastLaunchAt < 1500) {
             console.log('[Launch] Duplicate launch ignored (debounce)');
-            return res.json({ success: true, message: 'Duplicate launch ignored' });
+            // ignored:true lets the frontend keep the spinner without
+            // counting a second play for the same human press.
+            return res.json({ success: true, ignored: true, message: 'Duplicate launch ignored' });
         }
         lastLaunchAt = nowMs;
 

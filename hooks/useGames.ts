@@ -155,8 +155,9 @@ export function useGames(apiUrl: string, preferredController: number = -1) {
 
             const data = await response.json();
 
-            if (data.success) {
-                // Update play count and last played
+            if (data.success && !data.ignored) {
+                // Update play count and last played — but not for a
+                // debounced duplicate press, which starts no new process.
                 updateGame(game.id, {
                     playCount: game.playCount + 1,
                     lastPlayed: Date.now(),

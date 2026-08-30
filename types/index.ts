@@ -1,5 +1,8 @@
 export interface LaunchResponse {
     success: boolean;
+    // Set when the backend debounced this request as a duplicate press;
+    // the launch "succeeded" but no new process was started.
+    ignored?: boolean;
     error?: string;
 }
 
