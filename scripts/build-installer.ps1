@@ -25,10 +25,10 @@ Write-Host "==> Installing dependencies (root)"
 npm ci
 if ($LASTEXITCODE -ne 0) { throw "npm ci (root) failed" }
 
-Write-Host "==> Installing dependencies (backend) — vigemclient MUST build here (virtual controller)"
+Write-Host "==> Installing dependencies (backend) - vigemclient MUST build here (virtual controller)"
 Push-Location backend
 npm ci
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "npm ci (backend) failed — see vigemclient note in the header" }
+if ($LASTEXITCODE -ne 0) { Pop-Location; throw "npm ci (backend) failed - see vigemclient note in the header" }
 Pop-Location
 
 Write-Host "==> Type check"
@@ -53,5 +53,5 @@ if (Test-Path $dest) {
     Write-Host "==> Delivered to $copied (md5 verified)"
     Write-Host "    Reminder: delete the previous version's artifact from installers\."
 } else {
-    Write-Host "==> installers\ not found and INSTALLERS_DIR unset — artifact left in release\."
+    Write-Host "==> installers\ not found and INSTALLERS_DIR unset - artifact left in release\."
 }
