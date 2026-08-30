@@ -47,11 +47,17 @@ platform — never reuse `node_modules` across OSes.
   icon fonts!) are explicitly re-included — do not remove those lines.
 - `asar` is intentionally OFF: the backend is forked as a real file and hands
   `.ps1` paths to PowerShell; neither works from inside an asar archive.
-- Windows: `vigemclient` must be compiled with upstream node-gyp
-  (`npx node-gyp@11 rebuild` in its folder) — the Electron node-gyp fork
-  wants a ClangCL toolset that is usually not installed. Icon embedding
-  works without Developer Mode only because the winCodeSign cache was
-  pre-extracted (darwin symlinks skipped).
+- Windows: `vigemclient` must be compiled with upstream node-gyp AND
+  against Electron's headers:
+  `npx node-gyp@11 rebuild --target=<electron version> --arch=x64 --disturl=https://electronjs.org/headers`
+  (the Electron node-gyp fork wants a ClangCL toolset that is usually not
+  installed, and a system-Node-header build has hard-crashed the packaged
+  backend at module load; the Electron-header build loads under plain Node
+  too, so dev mode keeps working). Also: it is an optionalDependency —
+  npm ci SILENTLY drops it on build failure; scripts/build-installer.ps1
+  guards against that. Icon embedding works without Developer Mode only
+  because the winCodeSign cache was pre-extracted (darwin symlinks
+  skipped).
 - The ViGEm binding's `pad.userIndex` lies (returns the ViGEm serial, not
   the XInput slot) — the slot is detected by before/after diffing.
 - The aggregator's virtual pad echoes physical input one frame later; the UI

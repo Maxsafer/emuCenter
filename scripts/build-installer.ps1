@@ -44,8 +44,14 @@ if (-not (Test-Path (Join-Path $vigem "build\Release\vigemclient.node"))) {
         npm install --ignore-scripts
         Pop-Location
     }
+    # Build against ELECTRON's headers, not the system Node's: the packaged
+    # backend runs under Electron-as-node, and a system-Node build of this
+    # addon has been seen to hard-crash it at load (2026-08-30). The
+    # Electron-header build also loads fine under plain Node for dev mode.
+    # Keep the target in sync with the electron version in package.json.
+    $electronVersion = node -p "require('./package.json').devDependencies.electron.replace('^','')"
     Push-Location $vigem
-    npx --yes node-gyp@11 rebuild
+    npx --yes node-gyp@11 rebuild --target=$electronVersion --arch=x64 --disturl=https://electronjs.org/headers
     Pop-Location
     if (-not (Test-Path (Join-Path $vigem "build\Release\vigemclient.node"))) {
         throw "vigemclient failed to build - the installer would ship without the virtual controller"
