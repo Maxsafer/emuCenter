@@ -31,6 +31,27 @@ npm ci
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "npm ci (backend) failed - see vigemclient note in the header" }
 Pop-Location
 
+# vigemclient is an OPTIONAL dependency: when its node-gyp build fails (the
+# electron-forked node-gyp wants the usually-absent ClangCL toolset), npm ci
+# SUCCEEDS and silently drops the module - and the installer would ship
+# without the virtual controller. Detect that and rebuild with upstream
+# node-gyp, failing loudly if it still cannot be produced.
+$vigem = Join-Path $Root "backend\node_modules\vigemclient"
+if (-not (Test-Path (Join-Path $vigem "build\Release\vigemclient.node"))) {
+    Write-Host "==> vigemclient missing after npm ci - rebuilding with upstream node-gyp"
+    if (-not (Test-Path $vigem)) {
+        Push-Location backend
+        npm install --ignore-scripts
+        Pop-Location
+    }
+    Push-Location $vigem
+    npx --yes node-gyp@11 rebuild
+    Pop-Location
+    if (-not (Test-Path (Join-Path $vigem "build\Release\vigemclient.node"))) {
+        throw "vigemclient failed to build - the installer would ship without the virtual controller"
+    }
+}
+
 Write-Host "==> Type check"
 npx tsc --noEmit
 if ($LASTEXITCODE -ne 0) { throw "tsc failed" }
