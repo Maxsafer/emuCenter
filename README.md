@@ -3,7 +3,7 @@
    <img src="backend/images/logo.png" alt="logo" width=50%/>
 </p>
 
-I made this highly customizable hub in order to have all of my retro games from different emulators ready to launch from just one place. This is the next generation of my original [EmuCenter](https://github.com/Maxsafer/emuCenter) (Python/Qt) — rebuilt with a modern UI, animated covers, automatic cover art, and a proper Windows installer, while keeping everything that made the original work: launch templates, custom scripts, controller navigation and the virtual controller.
+I made this highly customizable hub in order to have all of my retro games from different emulators ready to launch from just one place. This is the next generation of my original [EmuCenter](https://github.com/Maxsafer/emuCenter/tree/main) (Python/Qt, still available on the `main` branch) — rebuilt with a modern UI, animated covers, automatic cover art, and installers for Windows, macOS and Linux, while keeping everything that made the original work: launch templates, custom scripts, controller navigation and the virtual controller.
 
 I specifically made this for my need of having an emulator game hub for my Ayaneo Slide (handheld PC with a touchscreen).
 
