@@ -1,0 +1,64 @@
+# Builds the Windows installer and signs it through SignPath Foundation's
+# free open-source program, attaching the SIGNED exe to an existing release.
+#
+# MANUAL TRIGGER ONLY (workflow_dispatch) - this never runs on its own.
+# Actions tab -> "Sign Windows Release" -> Run workflow -> enter the tag.
+#
+# One-time setup after SignPath approves the project:
+#   - Repo Settings -> Secrets and variables -> Actions:
+#       secret  SIGNPATH_API_TOKEN        (from the SignPath dashboard)
+#       variable SIGNPATH_ORGANIZATION_ID (from the SignPath dashboard)
+#   - Adjust project-slug / signing-policy-slug below to match the
+#     SignPath project configuration.
+name: Sign Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing release tag to attach the signed installer to (e.g. v3.1.1)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.release_tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build installer (script handles the vigemclient guard)
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
+
+      - name: Upload unsigned installer as workflow artifact
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: release/*.exe
+          if-no-files-found: error
+
+      - name: Submit to SignPath and wait for the signed artifact
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: emucenter
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Attach signed installer to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: signed/*.exe

@@ -40,6 +40,8 @@ Grab the latest release for your platform from the [Releases](../../releases) pa
 
 Your library, settings and uploaded covers live in the app's data folder — `%APPDATA%\EmuCenter` (Windows), `~/Library/Application Support/EmuCenter` (macOS), `~/.config/emucenter` (Linux) — so reinstalling or updating never touches your setup.
 
+> **Code signing:** free code signing on Windows is provided by [SignPath.io](https://signpath.io), certificate by the [SignPath Foundation](https://signpath.org). Some antivirus tools may still warn on brand-new releases while the certificate builds reputation — the full source is here to audit or build yourself.
+
 # !! Setting-up-EmuCenter
 
 Everything is configured inside the UI — there are no configuration files to edit by hand anymore, and unlike the original there is **no required folder hierarchy**: your emulator `.exe` and your games folders can live anywhere.
