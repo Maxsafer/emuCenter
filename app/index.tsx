@@ -98,8 +98,8 @@ export default function HomeScreen() {
   const [editingEmulator, setEditingEmulator] = useState<any | null>(null);
 
   // The pressed card shows a spinner in its title row: instant feedback
-  // that the launch registered. Cleared after a few seconds (the window
-  // minimizes while the game runs) or immediately on failure.
+  // that the launch registered. Cleared after a few seconds (the game
+  // window owns the screen by then) or immediately on failure.
   const [launchingGameId, setLaunchingGameId] = useState<string | null>(null);
   const launchSpinnerTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 

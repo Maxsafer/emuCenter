@@ -507,14 +507,14 @@ function launchDetached(command, cwd) {
         });
         child.once('error', reject);
         child.once('spawn', () => {
-            // Tell the Electron shell (fork IPC) that a game is running so
-            // it can get out of the way: the backend is a background
-            // process with no foreground rights on Windows, so the
-            // emulator window opens BEHIND the fullscreen launcher unless
-            // the launcher minimizes. cmd /c and /bin/sh -c both wait for
+            // Tell the Electron shell (fork IPC) that a game is running:
+            // the backend is a background process with no foreground
+            // rights on Windows, so the emulator window opens BEHIND the
+            // fullscreen launcher until the shell promotes it
+            // (bringGameForward). cmd /c and /bin/sh -c both wait for
             // the emulator, so this child's exit tracks the game's exit.
-            // `remaining` carries the authoritative live count; the shell
-            // also polls /launch-status as a backstop for lost events.
+            // `remaining` carries the authoritative live count;
+            // /launch-status exposes it for diagnostics.
             liveChildren.add(child);
             child.once('exit', () => {
                 liveChildren.delete(child);
@@ -682,9 +682,9 @@ app.post('/launch', async (req, res) => {
 
 /**
  * GET /launch-status
- * How many launched games are still actually running. The shell polls
- * this while it sits minimized for a game, as a self-healing backstop
- * against lost exit events (zero live games = time to come back).
+ * How many launched games are still actually running. Diagnostic mirror
+ * of the fork-IPC `remaining` count; the shell no longer polls it - the
+ * game-exited message drives the foreground hand-back.
  */
 app.get('/launch-status', (req, res) => {
     res.json({ running: liveChildren.size });

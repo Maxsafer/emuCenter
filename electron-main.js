@@ -72,21 +72,6 @@ function llog(line) {
 }
 
 /**
- * Bring the launched game's window to the front once it exists.
- *
- * The launcher deliberately does NOT minimize (an earlier design did,
- * and any lost exit event left it stranded in the taskbar). Instead it
- * stays fullscreen underneath, and this helper walks the launched
- * process tree until a real visible window appears, then forces it to
- * the foreground - allowed because the helper is spawned by the current
- * foreground process, with the AttachThreadInput trick as belt and
- * braces. When the game window later closes, Windows activates the next
- * window in z-order, which is the launcher: no restore logic, no
- * counters, nothing that can get stuck. Console windows are skipped so
- * a chatty emulator's log console is not promoted over its render
- * window. Gives up silently after ~20s (game failed to open a window).
- */
-/**
  * Bring the launcher itself back to the foreground. Used after the last
  * game exits when Windows' own hand-back did not land on us (some other
  * window was raised mid-game) - on a controller there is no practical
@@ -120,6 +105,21 @@ function forceSelfForeground() {
     ).on('error', () => { /* no powershell - alt-tab it is */ });
 }
 
+/**
+ * Bring the launched game's window to the front once it exists.
+ *
+ * The launcher deliberately does NOT minimize (an earlier design did,
+ * and any lost exit event left it stranded in the taskbar). Instead it
+ * stays fullscreen underneath, and this helper walks the launched
+ * process tree until a real visible window appears, then forces it to
+ * the foreground - allowed because the helper is spawned by the current
+ * foreground process, with the AttachThreadInput trick as belt and
+ * braces. When the game window later closes, Windows activates the next
+ * window in z-order, which is the launcher: no restore logic, no
+ * counters, nothing that can get stuck. Console windows are skipped so
+ * a chatty emulator's log console is not promoted over its render
+ * window. Gives up silently after ~20s (game failed to open a window).
+ */
 function bringGameForward(rootPid) {
     if (process.platform !== 'win32') return;
     const cs = 'using System; using System.Runtime.InteropServices; using System.Text;' +
