@@ -29,6 +29,7 @@ I specifically made this for my need of having an emulator game hub for my Ayane
 4. [Pictures](#-pictures)
 5. [How to use](#-how-to-use)
 6. [Future development](#-future-development)
+7. [Related projects](#-related-projects)
 
 
 # !! EmuCenter-Files
@@ -69,7 +70,7 @@ This Python file contains the main UI displayed with Qt. It also contains most o
 
 ### /virtual_pad_vg.py
 
-Creates and manages a virtual Xbox 360 controller using ViGEmBus. Aggregates input from multiple physical XInput controllers into a single virtual controller, with automatic ownership switching based on activity and rumble feedback passthrough.
+Creates and manages a virtual Xbox 360 controller using ViGEmBus. Aggregates input from multiple physical XInput controllers into a single virtual controller, with automatic ownership switching based on activity and rumble feedback passthrough. The same aggregator is available standalone as [xinagg360](https://github.com/Maxsafer/xinagg360).
 
 ### /xinput_handler.py
 
@@ -290,3 +291,11 @@ When in focus, EmuCenter can be closed with ESC, Ctrl+c and Ctrl+q and with a co
 # !! Future-development
 This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.<br>
 [Support cool projects like this one! :)](https://www.paypal.com/donate/?hosted_button_id=SRATUX8VNHC9G)
+
+# !! Related-projects
+All of these share the same ViGEmBus + vgamepad base and were built around my AYANEO Slide.
+
+| Project | What it does |
+|---|---|
+| [xinagg360](https://github.com/Maxsafer/xinagg360) | Aggregates every connected XInput controller into one virtual Xbox 360 pad. Fixes old games that choke on modern controllers, and lets any pad drive one stable controller. |
+| [xinhome](https://github.com/Maxsafer/xinhome) | Presses the Xbox guide button on a throwaway virtual pad. Gives handhelds without an Xbox button (like the AYANEO Slide) one, bound to a custom key. |
