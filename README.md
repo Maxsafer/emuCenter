@@ -23,6 +23,7 @@ I specifically made this for my need of having an emulator game hub for my Ayane
 6. [Tested emulators](#-tested-emulators)
 7. [Running from source](#-running-from-source)
 8. [Future development](#-future-development)
+9. [Related projects](#-related-projects)
 
 # !! Download-and-Install
 
@@ -137,7 +138,7 @@ A navigation sound plays as you move — volume (or mute) is in Settings.
 
 ## Virtual controller
 
-Enable **Virtual controller** in Settings and EmuCenter creates one stable virtual Xbox 360 pad (via ViGEmBus) that whichever physical controller you pick up automatically drives — with rumble passthrough. Configure your emulators against the virtual pad **once**, and any controller just works, no remapping. While it is enabled, `vcontroller` in launch templates automatically becomes the virtual pad's index. This has been super handy with Dolphin and YUZU/EDEN.
+Enable **Virtual controller** in Settings and EmuCenter creates one stable virtual Xbox 360 pad (via ViGEmBus) that whichever physical controller you pick up automatically drives — with rumble passthrough. Configure your emulators against the virtual pad **once**, and any controller just works, no remapping. While it is enabled, `vcontroller` in launch templates automatically becomes the virtual pad's index. This has been super handy with Dolphin and YUZU/EDEN. The same aggregator is available standalone as [xinagg360](https://github.com/Maxsafer/xinagg360).
 
 ## Launching and closing games
 
@@ -183,6 +184,14 @@ Stack: Expo/React Native Web frontend, Express backend (scanning, launching, cov
 
 This was a fun project to develop and I intend to work on the interface/navigation or any bugs that are reported.<br>
 [Support cool projects like this one! :)](https://www.paypal.com/donate/?hosted_button_id=SRATUX8VNHC9G)
+
+# !! Related-projects
+All of these share the same ViGEmBus + vgamepad base and were built around my AYANEO Slide.
+
+| Project | What it does |
+|---|---|
+| [xinagg360](https://github.com/Maxsafer/xinagg360) | Aggregates every connected XInput controller into one virtual Xbox 360 pad. Fixes old games that choke on modern controllers, and lets any pad drive one stable controller. |
+| [xinhome](https://github.com/Maxsafer/xinhome) | Presses the Xbox guide button on a throwaway virtual pad. Gives handhelds without an Xbox button (like the AYANEO Slide) one, bound to a custom key. |
 
 # License
 
